@@ -1,0 +1,14 @@
+{
+  "name": "algebras-agent",
+  "owner": {
+    "name": "Algebras",
+    "email": "support@algebras.ai"
+  },
+  "plugins": [
+    {
+      "name": "algebras-agent",
+      "source": ".",
+      "description": "AI translation workflow with automated QA and fluency scoring"
+    }
+  ]
+}

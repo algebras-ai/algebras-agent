@@ -6,41 +6,50 @@ Works with Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, or any agent th
 
 ---
 
-## Quickstart (3 steps)
+## Install
 
-### Step 1 — Install
+### Claude Code
 
-Paste this into your AI agent and send:
+Run these two commands inside Claude Code (no cloning required):
 
 ```
-Clone https://github.com/algebras-ai/algebras-agent into a folder called .algebras in my project root,
-then copy CLAUDE.md, AGENTS.md, .cursorrules, .windsurfrules, and COMMON_MISTAKES.md into my project root.
+/plugin marketplace add algebras-ai/algebras-agent
+/plugin install algebras-agent@algebras-agent
 ```
 
-The agent will clone the repo and drop the workflow files into your project.
+Then run the setup skill. It opens your browser for the API key, copies the workflow files into your project, and registers the MCP server automatically:
 
-### Step 2 — Connect to Algebras
+```
+/algebras-agent:setup
+```
 
-> **Requires Node.js 18+** — install from [nodejs.org](https://nodejs.org) if you don't have it.
+Reload plugins when prompted:
 
-Run from inside the cloned `.algebras` folder:
+```
+/reload-plugins
+```
+
+### Cursor / Windsurf / Codex
+
+Run from your project root:
 
 ```bash
-node .algebras/setup.js
+curl -fsSL https://platform.algebras.ai/install | bash
 ```
 
-This opens a browser, logs you in, and prints an MCP config snippet. Add that snippet to your agent's MCP config file:
+The script opens your browser for the API key, downloads the workflow files, and writes the MCP config automatically (`.cursor/mcp.json`, `.windsurf/mcp.json`, or `~/.codex/config.json`).
 
-| Agent | Config file |
-|---|---|
-| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Claude Code | `~/.claude/settings.json` (or project `.claude/settings.json`) |
-| Cursor | `.cursor/mcp.json` in your project root |
-| Windsurf | `.windsurf/mcp.json` in your project root |
-| Codex | `~/.codex/config.json` |
-| Other | Check your agent's MCP documentation |
+If your agent isn't auto-detected, pass `--agent` explicitly:
 
-### Step 3 — Translate
+```bash
+curl -fsSL https://platform.algebras.ai/install | bash -s -- --agent cursor
+curl -fsSL https://platform.algebras.ai/install | bash -s -- --agent windsurf
+curl -fsSL https://platform.algebras.ai/install | bash -s -- --agent codex
+```
+
+---
+
+## Translate
 
 Open your project in your agent and send:
 
@@ -48,14 +57,14 @@ Open your project in your agent and send:
 Translate this project.
 ```
 
-The agent will onboard your project, build a glossary, translate, and run QA automatically.
+The agent onboards your project, builds a glossary, translates, and runs QA automatically.
 
 ---
 
 ## What's included
 
 | File | Purpose |
-|---|---|
+|------|---------|
 | `CLAUDE.md` | Workflow for Claude Code and Claude Desktop |
 | `AGENTS.md` | Workflow for OpenAI Codex / Agents |
 | `.cursorrules` | Workflow for Cursor |
@@ -65,6 +74,5 @@ The agent will onboard your project, build a glossary, translate, and run QA aut
 
 ## Requirements
 
-- Node.js 18+ (for `setup.js`)
 - Python 3.10+ (for QA tools)
 - An [Algebras](https://platform.algebras.ai) account

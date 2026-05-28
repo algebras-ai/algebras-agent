@@ -1,0 +1,9 @@
+{
+  "name": "algebras-agent",
+  "description": "AI translation workflow — automated QA and fluency scoring via Algebras",
+  "author": {
+    "name": "Algebras",
+    "email": "support@algebras.ai"
+  },
+  "homepage": "https://platform.algebras.ai"
+}

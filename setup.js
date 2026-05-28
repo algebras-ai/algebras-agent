@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // One-time setup: authenticates with Algebras and saves ALGEBRAS_API_KEY to .env
 
-import { createServer } from "http";
-import { writeFileSync, readFileSync, existsSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
 import { execSync } from "child_process";
-import { URL } from "url";
+import { createInterface } from "readline";
+import { homedir } from "os";
+import { join, dirname } from "path";
 
 // Load .env before reading any env vars
 if (existsSync(".env")) {
@@ -17,25 +18,83 @@ if (existsSync(".env")) {
 }
 
 const PLATFORM_URL = process.env.ALGEBRAS_PLATFORM_URL ?? "https://platform.algebras.ai";
-const CALLBACK_PORT = 3456;
-const CALLBACK_URL = `http://localhost:${CALLBACK_PORT}`;
 
-function openBrowser(url) {
-  const platform = process.platform;
-  try {
-    if (platform === "darwin") execSync(`open "${url}"`);
-    else if (platform === "win32") execSync(`start "" "${url}"`);
-    else execSync(`xdg-open "${url}"`);
-  } catch {
-    console.log(`\nCould not open browser automatically. Open this URL manually:\n\n  ${url}\n`);
+// --agent <name> override
+const agentFlagIdx = process.argv.indexOf("--agent");
+const agentFlag = agentFlagIdx !== -1 ? process.argv[agentFlagIdx + 1] ?? null : null;
+
+const AGENTS = {
+  cursor:   { configPath: join(process.cwd(), ".cursor", "mcp.json") },
+  windsurf: { configPath: join(process.cwd(), ".windsurf", "mcp.json") },
+  codex:    { configPath: join(homedir(), ".codex", "config.json") },
+};
+
+function detectAgent() {
+  if (agentFlag) {
+    if (!AGENTS[agentFlag]) {
+      console.error(`Unknown agent: "${agentFlag}". Known values: ${Object.keys(AGENTS).join(", ")}`);
+      process.exit(1);
+    }
+    return agentFlag;
   }
+  if (existsSync(join(process.cwd(), ".cursor")))   return "cursor";
+  if (existsSync(join(process.cwd(), ".windsurf"))) return "windsurf";
+  if (existsSync(join(homedir(), ".codex")))        return "codex";
+  return null;
+}
+
+function mcpBlock(key) {
+  return {
+    mcpServers: {
+      algebras: {
+        type: "http",
+        url: `${PLATFORM_URL}/api/mcp`,
+        headers: { "x-api-key": key },
+      },
+    },
+  };
+}
+
+function writeMcpConfig(agent, key) {
+  const { configPath } = AGENTS[agent];
+  const dir = dirname(configPath);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+  let existing = {};
+  if (existsSync(configPath)) {
+    try {
+      existing = JSON.parse(readFileSync(configPath, "utf8"));
+    } catch {
+      console.error(`Warning: ${configPath} has a JSON syntax error — overwriting.`);
+    }
+  }
+
+  const merged = {
+    ...existing,
+    mcpServers: { ...(existing.mcpServers ?? {}), ...mcpBlock(key).mcpServers },
+  };
+
+  writeFileSync(configPath, JSON.stringify(merged, null, 2) + "\n", "utf8");
+  console.log(`MCP server registered in ${configPath}`);
+}
+
+function printMcpConfig(key) {
+  console.log(`
+No agent config directory detected. Add the following to your agent's MCP config file:
+
+  Cursor    →  .cursor/mcp.json   (project root)
+  Windsurf  →  .windsurf/mcp.json (project root)
+  Codex     →  ~/.codex/config.json
+
+${JSON.stringify(mcpBlock(key), null, 2)}
+
+Re-run with --agent <cursor|windsurf|codex> to write it automatically.
+`);
 }
 
 function setEnvVar(content, key, value) {
   const pattern = new RegExp(`^${key}=.*`, "m");
-  if (pattern.test(content)) {
-    return content.replace(pattern, `${key}=${value}`);
-  }
+  if (pattern.test(content)) return content.replace(pattern, `${key}=${value}`);
   return content + (content.endsWith("\n") || content === "" ? "" : "\n") + `${key}=${value}\n`;
 }
 
@@ -45,7 +104,7 @@ function writeEnv(key) {
   content = setEnvVar(content, "ALGEBRAS_API_KEY", key);
   content = setEnvVar(content, "ALGEBRAS_PLATFORM_URL", PLATFORM_URL);
   writeFileSync(envPath, content, "utf8");
-  console.log(`Wrote ALGEBRAS_API_KEY and ALGEBRAS_PLATFORM_URL to .env`);
+  console.log(`Wrote ALGEBRAS_API_KEY to .env`);
 }
 
 function updateProjectJson() {
@@ -61,71 +120,36 @@ function updateProjectJson() {
   }
 }
 
-function printNextSteps(key) {
-  console.log(`
-Setup complete.
-
-Add the following to your MCP client config:
-
-  Claude Desktop  →  ~/Library/Application Support/Claude/claude_desktop_config.json
-  Cursor          →  .cursor/mcp.json (in your project root)
-
-{
-  "mcpServers": {
-    "algebras": {
-      "url": "${PLATFORM_URL}/api/mcp",
-      "headers": {
-        "x-api-key": "${key}"
-      }
-    }
+async function askApiKey() {
+  const apiKeysUrl = `${PLATFORM_URL}/api-keys`;
+  try {
+    if (process.platform === "darwin")      execSync(`open "${apiKeysUrl}"`);
+    else if (process.platform === "win32")  execSync(`start "" "${apiKeysUrl}"`);
+    else                                    execSync(`xdg-open "${apiKeysUrl}"`);
+  } catch {
+    process.stderr.write(`\nOpen this URL to get your API key:\n  ${apiKeysUrl}\n`);
   }
-}
 
-Then copy CLAUDE.md, tools/, and glossary/ into your translation project:
-
-  cp -r tools/ glossary/ CLAUDE.md COMMON_MISTAKES.md project.json .env your-project/
-`);
-}
-
-async function waitForCallback() {
-  return new Promise((resolve, reject) => {
-    const server = createServer((req, res) => {
-      const url = new URL(req.url, CALLBACK_URL);
-      const key = url.searchParams.get("key");
-
-      res.writeHead(200, { "Content-Type": "text/html" });
-      if (key) {
-        res.end("<html><body><h2>Algebras MCP connected.</h2><p>You can close this tab.</p></body></html>");
-        server.close();
-        resolve(key);
-      } else {
-        res.end("<html><body><h2>Missing key parameter.</h2></body></html>");
-        server.close();
-        reject(new Error("No key in callback"));
-      }
-    });
-
-    server.listen(CALLBACK_PORT, "localhost", () => {
-      const authUrl = `${PLATFORM_URL}/api/auth/mcp-connect?callback=${encodeURIComponent(CALLBACK_URL)}`;
-      console.log("Opening browser to authenticate with Algebras...");
-      openBrowser(authUrl);
-    });
-
-    server.on("error", reject);
-
-    setTimeout(() => {
-      server.close();
-      reject(new Error("Timed out waiting for authentication (120s)"));
-    }, 120_000);
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stderr });
+    process.stderr.write(`\nPaste your Algebras API key:\n> `);
+    rl.once("line", (line) => { rl.close(); resolve(line.trim()); });
   });
 }
 
-try {
-  const key = await waitForCallback();
-  writeEnv(key);
-  updateProjectJson();
-  printNextSteps(key);
-} catch (err) {
-  console.error("Setup failed:", err.message);
+const key = await askApiKey();
+if (!key || key.includes(" ")) {
+  console.error("Invalid key. Exiting.");
   process.exit(1);
+}
+
+writeEnv(key);
+updateProjectJson();
+
+const agent = detectAgent();
+if (agent) {
+  writeMcpConfig(agent, key);
+  console.log(`\nSetup complete. Open your project in ${agent} and say: "Translate this project."`);
+} else {
+  printMcpConfig(key);
 }
