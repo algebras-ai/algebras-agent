@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "algebras-agent",
-      "source": "./",
+      "source": "./plugin",
       "description": "AI translation workflow with automated QA and fluency scoring"
     }
   ]

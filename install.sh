@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PLATFORM_URL="https://platform.algebras.ai"
-GITHUB_RAW="https://raw.githubusercontent.com/algebras-ai/algebras-agent/main"
+GITHUB_RAW="https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/plugin"
 WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md)
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
