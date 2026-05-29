@@ -56,6 +56,8 @@ Restart Codex when prompted. You can verify the Algebras MCP server from:
 /mcp
 ```
 
+The plugin does not start the MCP server until setup saves your Algebras API key. If `/mcp` shows an unauthenticated `algebras` startup error from an earlier install, remove the old plugin install or delete the stale `algebras` MCP entry, run `$setup`, and restart Codex.
+
 ### Cursor / Windsurf / Codex fallback
 
 Run from your project root:

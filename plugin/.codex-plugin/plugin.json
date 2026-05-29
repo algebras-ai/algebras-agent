@@ -12,7 +12,6 @@
   "license": "MIT",
   "keywords": ["translation", "localization", "qa", "fluency", "mcp"],
   "skills": "./skills/",
-  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Algebras Agent",
     "shortDescription": "Translation workflows with QA and fluency scoring.",
