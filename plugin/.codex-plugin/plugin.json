@@ -1,0 +1,30 @@
+{
+  "name": "algebras-agent",
+  "version": "1.0.0",
+  "description": "AI translation workflow with automated QA and fluency scoring via Algebras.",
+  "author": {
+    "name": "Algebras",
+    "email": "support@algebras.ai",
+    "url": "https://platform.algebras.ai"
+  },
+  "homepage": "https://platform.algebras.ai",
+  "repository": "https://github.com/algebras-ai/algebras-agent",
+  "license": "MIT",
+  "keywords": ["translation", "localization", "qa", "fluency", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Algebras Agent",
+    "shortDescription": "Translation workflows with QA and fluency scoring.",
+    "longDescription": "Install the Algebras translation workflow in Codex, copy reusable agent instructions into a localization project, and connect Codex to Algebras MCP tools for fluency QA.",
+    "developerName": "Algebras",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://platform.algebras.ai",
+    "defaultPrompt": [
+      "Use Algebras Agent to set up this translation project.",
+      "Translate this project and run fluency QA with Algebras."
+    ],
+    "brandColor": "#10A37F"
+  }
+}

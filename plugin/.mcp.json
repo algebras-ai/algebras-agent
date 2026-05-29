@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "algebras": {
+      "url": "https://platform.algebras.ai/api/mcp",
+      "http_headers": {
+        "x-api-key": "${ALGEBRAS_API_KEY}"
+      }
+    }
+  }
+}

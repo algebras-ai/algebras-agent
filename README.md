@@ -29,7 +29,34 @@ Reload plugins when prompted:
 /reload-plugins
 ```
 
-### Cursor / Windsurf / Codex
+### Codex
+
+Add the Algebras plugin marketplace, then install the plugin from Codex:
+
+```bash
+codex plugin marketplace add algebras-ai/algebras-agent
+codex
+```
+
+Inside Codex, open the plugin browser:
+
+```
+/plugins
+```
+
+Install `algebras-agent`, then run the setup skill:
+
+```
+$setup
+```
+
+Restart Codex when prompted. You can verify the Algebras MCP server from:
+
+```
+/mcp
+```
+
+### Cursor / Windsurf / Codex fallback
 
 Run from your project root:
 
@@ -37,7 +64,7 @@ Run from your project root:
 curl -fsSL https://platform.algebras.ai/install | bash
 ```
 
-The script opens your browser for the API key, downloads the workflow files, and writes the MCP config automatically (`.cursor/mcp.json`, `.windsurf/mcp.json`, or `~/.codex/config.json`).
+The script opens your browser for the API key, downloads the workflow files, and writes the MCP config automatically (`.cursor/mcp.json`, `.windsurf/mcp.json`, or `~/.codex/config.toml`).
 
 If your agent isn't auto-detected, pass `--agent` explicitly:
 

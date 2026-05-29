@@ -34,7 +34,7 @@ mcp_config_path() {
   case "$1" in
     cursor)   echo "$PWD/.cursor/mcp.json" ;;
     windsurf) echo "$PWD/.windsurf/mcp.json" ;;
-    codex)    echo "$HOME/.codex/config.json" ;;
+    codex)    echo "$HOME/.codex/config.toml" ;;
   esac
 }
 
@@ -127,14 +127,62 @@ config_path=$(mcp_config_path "$agent")
 mkdir -p "$(dirname "$config_path")"
 
 ALGEBRAS_CONFIG_PATH="$config_path" \
+ALGEBRAS_AGENT="$agent" \
 ALGEBRAS_API_KEY="$api_key" \
 ALGEBRAS_PLATFORM_URL="$PLATFORM_URL" \
 python3 - <<'PYEOF'
 import json, os, sys
 
 path    = os.environ["ALGEBRAS_CONFIG_PATH"]
+agent   = os.environ["ALGEBRAS_AGENT"]
 api_key = os.environ["ALGEBRAS_API_KEY"]
 url     = os.environ["ALGEBRAS_PLATFORM_URL"]
+
+if agent == "codex":
+    toml_url = json.dumps(f"{url}/api/mcp")
+    toml_key = json.dumps(api_key)
+    block = f'''[mcp_servers.algebras]
+url = {toml_url}
+enabled = true
+http_headers = {{ "x-api-key" = {toml_key} }}
+'''
+
+    content = ""
+    if os.path.exists(path):
+        with open(path) as f:
+            content = f.read()
+
+    lines = content.splitlines()
+    out = []
+    i = 0
+    replaced = False
+    while i < len(lines):
+        line = lines[i]
+        if line.strip() == "[mcp_servers.algebras]":
+            if out and out[-1].strip():
+                out.append("")
+            out.extend(block.rstrip("\n").splitlines())
+            replaced = True
+            i += 1
+            while i < len(lines):
+                stripped = lines[i].strip()
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    break
+                i += 1
+            if i < len(lines) and out[-1].strip():
+                out.append("")
+            continue
+        out.append(line)
+        i += 1
+
+    if not replaced:
+        if out and out[-1].strip():
+            out.append("")
+        out.extend(block.rstrip("\n").splitlines())
+
+    with open(path, "w") as f:
+        f.write("\n".join(out).rstrip() + "\n")
+    raise SystemExit(0)
 
 existing = {}
 if os.path.exists(path):

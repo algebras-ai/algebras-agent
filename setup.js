@@ -26,7 +26,7 @@ const agentFlag = agentFlagIdx !== -1 ? process.argv[agentFlagIdx + 1] ?? null :
 const AGENTS = {
   cursor:   { configPath: join(process.cwd(), ".cursor", "mcp.json") },
   windsurf: { configPath: join(process.cwd(), ".windsurf", "mcp.json") },
-  codex:    { configPath: join(homedir(), ".codex", "config.json") },
+  codex:    { configPath: join(homedir(), ".codex", "config.toml") },
 };
 
 function detectAgent() {
@@ -55,10 +55,60 @@ function mcpBlock(key) {
   };
 }
 
+function tomlString(value) {
+  return JSON.stringify(value);
+}
+
+function writeCodexMcpConfig(configPath, key) {
+  const block = [
+    "[mcp_servers.algebras]",
+    `url = ${tomlString(`${PLATFORM_URL}/api/mcp`)}`,
+    "enabled = true",
+    `http_headers = { "x-api-key" = ${tomlString(key)} }`,
+  ].join("\n");
+
+  const content = existsSync(configPath) ? readFileSync(configPath, "utf8") : "";
+  const lines = content.split(/\r?\n/);
+  const out = [];
+  let replaced = false;
+
+  for (let i = 0; i < lines.length;) {
+    if (lines[i].trim() === "[mcp_servers.algebras]") {
+      if (out.length > 0 && out[out.length - 1].trim() !== "") out.push("");
+      out.push(...block.split("\n"));
+      replaced = true;
+      i += 1;
+      while (i < lines.length) {
+        const stripped = lines[i].trim();
+        if (stripped.startsWith("[") && stripped.endsWith("]")) break;
+        i += 1;
+      }
+      if (i < lines.length && out[out.length - 1].trim() !== "") out.push("");
+      continue;
+    }
+    out.push(lines[i]);
+    i += 1;
+  }
+
+  if (!replaced) {
+    while (out.length > 0 && out[out.length - 1].trim() === "") out.pop();
+    if (out.length > 0) out.push("");
+    out.push(...block.split("\n"));
+  }
+
+  writeFileSync(configPath, out.join("\n").trimEnd() + "\n", "utf8");
+}
+
 function writeMcpConfig(agent, key) {
   const { configPath } = AGENTS[agent];
   const dir = dirname(configPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+  if (agent === "codex") {
+    writeCodexMcpConfig(configPath, key);
+    console.log(`MCP server registered in ${configPath}`);
+    return;
+  }
 
   let existing = {};
   if (existsSync(configPath)) {
@@ -79,14 +129,25 @@ function writeMcpConfig(agent, key) {
 }
 
 function printMcpConfig(key) {
+  const codexToml = [
+    "[mcp_servers.algebras]",
+    `url = ${tomlString(`${PLATFORM_URL}/api/mcp`)}`,
+    "enabled = true",
+    `http_headers = { "x-api-key" = ${tomlString(key)} }`,
+  ].join("\n");
+
   console.log(`
 No agent config directory detected. Add the following to your agent's MCP config file:
 
   Cursor    →  .cursor/mcp.json   (project root)
   Windsurf  →  .windsurf/mcp.json (project root)
-  Codex     →  ~/.codex/config.json
+  Codex     →  ~/.codex/config.toml
 
+Cursor / Windsurf:
 ${JSON.stringify(mcpBlock(key), null, 2)}
+
+Codex:
+${codexToml}
 
 Re-run with --agent <cursor|windsurf|codex> to write it automatically.
 `);

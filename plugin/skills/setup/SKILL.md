@@ -1,4 +1,5 @@
 ---
+name: setup
 description: Set up the Algebras translation agent — copies workflow files, registers MCP, saves API key
 allowed-tools: [Bash, Read, Write, Edit]
 ---
@@ -11,11 +12,18 @@ The user invoked this skill from inside their translation project. Use the curre
 
 ## Step 1 — Copy workflow files (no-clobber)
 
-Copy the workflow instruction files from the plugin cache into the project root. Use `${CLAUDE_PLUGIN_ROOT}` to reference the plugin directory:
+Copy the workflow instruction files from the plugin cache into the project root.
+
+Resolve `PLUGIN_ROOT` this way:
+- In Claude Code, use `${CLAUDE_PLUGIN_ROOT}` when it is set.
+- In Codex, use the installed plugin root that contains this `skills/setup/SKILL.md` file.
+- If neither can be resolved, search upward from this skill file until you find `CLAUDE.md`, `AGENTS.md`, and `COMMON_MISTAKES.md` together.
+
+Then copy from `PLUGIN_ROOT`:
 
 ```bash
 for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md; do
-  cp -n "${CLAUDE_PLUGIN_ROOT}/$f" "$PROJECT_ROOT/$f" 2>/dev/null || true
+  cp -n "${PLUGIN_ROOT}/$f" "$PROJECT_ROOT/$f" 2>/dev/null || true
 done
 ```
 
@@ -51,7 +59,7 @@ Write the result using the Write tool (not shell echo) so the key value doesn't 
 
 ## Step 4 — Register MCP server
 
-Run the following command to register the algebras MCP server for this project:
+If running in Claude Code, run the following command to register the algebras MCP server for this project:
 
 ```bash
 claude mcp add --transport http algebras https://platform.algebras.ai/api/mcp --header "x-api-key: <KEY>"
@@ -64,6 +72,17 @@ claude mcp add --transport http --force algebras https://platform.algebras.ai/ap
 ```
 
 This writes to `~/.claude.json` scoped to the current project — the correct location Claude Code reads MCP servers from.
+
+If running in Codex, update `~/.codex/config.toml` instead. Add or replace only this block, preserving all other Codex config:
+
+```toml
+[mcp_servers.algebras]
+url = "https://platform.algebras.ai/api/mcp"
+enabled = true
+http_headers = { "x-api-key" = "<KEY>" }
+```
+
+Use the Write or Edit tool so the key does not appear in shell output. This is the correct location Codex CLI and the Codex IDE extension read MCP servers from.
 
 ## Step 5 — Update project.json (non-fatal)
 
@@ -78,8 +97,9 @@ Setup complete.
 
   Workflow files  →  copied to <PROJECT_ROOT>
   API key         →  saved to <PROJECT_ROOT>/.env
-  MCP server      →  registered in ~/.claude.json (project scope)
+  MCP server      →  registered in <Claude or Codex MCP config>
 
-Restart Claude Code (quit and relaunch) to connect the algebras MCP tools (check_fluency, check_fluency_batch).
+Restart your agent to connect the algebras MCP tools (check_fluency, check_fluency_batch).
+In Codex, use /mcp after restart to confirm the algebras server is active.
 Then say: "Translate this project."
 ```
