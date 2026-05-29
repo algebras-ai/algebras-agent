@@ -49,29 +49,21 @@ Read `PROJECT_ROOT/.env` if it exists. Apply upsert logic:
 
 Write the result using the Write tool (not shell echo) so the key value doesn't appear in Bash output.
 
-## Step 4 — Register MCP server in ~/.claude/settings.json
+## Step 4 — Register MCP server
 
-Read `~/.claude/settings.json`. If the file doesn't exist, start with `{}`. If the file exists but is malformed JSON, stop and tell the user: "Your ~/.claude/settings.json has a JSON syntax error. Please fix it and run /algebras-agent:setup again."
+Run the following command to register the algebras MCP server for this project:
 
-If `mcpServers.algebras` already exists in the file, ask: "The algebras MCP server is already registered. Update the API key?" Proceed only if the user confirms.
-
-Merge the following into the parsed JSON, preserving all other keys:
-
-```json
-{
-  "mcpServers": {
-    "algebras": {
-      "type": "http",
-      "url": "https://platform.algebras.ai/api/mcp",
-      "headers": {
-        "x-api-key": "<KEY>"
-      }
-    }
-  }
-}
+```bash
+claude mcp add --transport http algebras https://platform.algebras.ai/api/mcp --header "x-api-key: <KEY>"
 ```
 
-Write the updated file with 2-space indentation using the Write tool.
+If the command output says the server already exists, run it with `--force` to overwrite:
+
+```bash
+claude mcp add --transport http --force algebras https://platform.algebras.ai/api/mcp --header "x-api-key: <KEY>"
+```
+
+This writes to `~/.claude.json` scoped to the current project — the correct location Claude Code reads MCP servers from.
 
 ## Step 5 — Update project.json (non-fatal)
 
@@ -86,8 +78,8 @@ Setup complete.
 
   Workflow files  →  copied to <PROJECT_ROOT>
   API key         →  saved to <PROJECT_ROOT>/.env
-  MCP server      →  registered in ~/.claude/settings.json
+  MCP server      →  registered in ~/.claude.json (project scope)
 
-Run /reload-plugins to activate the algebras MCP tools (check_fluency, check_fluency_batch).
+Restart Claude Code (quit and relaunch) to connect the algebras MCP tools (check_fluency, check_fluency_batch).
 Then say: "Translate this project."
 ```
