@@ -1,0 +1,49 @@
+name: Translate
+
+# Triggers: run on pushes to main that touch source locale files,
+# or manually via the GitHub Actions UI.
+on:
+  push:
+    branches: [main]
+    paths:
+      # Adjust this glob to match where your source strings live.
+      - "src/locales/**"
+      - "locales/**"
+      - "i18n/**"
+  workflow_dispatch:
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Required to push translated files or open a PR.
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch full history so git push works correctly.
+          fetch-depth: 0
+
+      - uses: algebras-ai/algebras-agent/.github/actions/algebras-translate@main
+        with:
+          # ── Required secrets ────────────────────────────────────────────────
+          # Set these in: Settings → Secrets and variables → Actions → New secret
+          algebras-api-key: ${{ secrets.ALGEBRAS_API_KEY }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # ── Provider (default: anthropic) ───────────────────────────────────
+          # llm-provider: "anthropic"   # or "openai"
+          # openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+
+          # ── Commit behaviour ────────────────────────────────────────────────
+          commit-changes: "true"
+          create-pr: "false"   # set to "true" to open a PR instead of pushing directly
+
+          # ── Skip if already complete ────────────────────────────────────────
+          skip-if-complete: "true"
+
+          # ── Optional: fail if any string scores below this (1–10) ──────────
+          # min-fluency-score: "7"

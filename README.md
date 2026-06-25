@@ -101,6 +101,60 @@ The agent onboards your project, builds a glossary, translates, and runs QA auto
 | `.github/copilot-instructions.md` | Workflow for GitHub Copilot |
 | `COMMON_MISTAKES.md` | Error taxonomy from real-world LQA |
 
+## GitHub Actions (CI/CD)
+
+Automate translation in any repo's CI pipeline — no manual setup required.
+
+### Quick start
+
+1. Add these secrets in your repo: **Settings → Secrets and variables → Actions**
+
+   | Secret | Value |
+   |--------|-------|
+   | `ALGEBRAS_API_KEY` | From [platform.algebras.ai/api-keys](https://platform.algebras.ai/api-keys) |
+   | `ANTHROPIC_API_KEY` | From [console.anthropic.com](https://console.anthropic.com) |
+
+2. Copy `.github/workflows/translate.example.yml` from this repo into your project's `.github/workflows/` and adjust the `paths` trigger to match your locale files.
+
+3. Push to `main` (or trigger via **Actions → Translate → Run workflow**).
+
+### What the action does
+
+On each run the action:
+1. Downloads the latest workflow prompt files from this repo
+2. Checks `project.json` — exits early if all strings are already translated (`skip-if-complete: true`)
+3. Writes a temporary MCP config pointing to the Algebras platform
+4. Installs the Claude CLI and runs it non-interactively against your project
+5. The agent runs the full workflow: **Onboard → Glossary → Translate → QA** (skips phases that are already done)
+6. Detects changed files via `git diff`; commits and pushes (or opens a PR)
+
+### Inputs
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `algebras-api-key` | — | **Required.** Algebras API key |
+| `llm-provider` | `anthropic` | `anthropic` or `openai` |
+| `anthropic-api-key` | — | Required if provider is `anthropic` |
+| `openai-api-key` | — | Required if provider is `openai` |
+| `algebras-platform-url` | `https://platform.algebras.ai` | Override for self-hosted |
+| `commit-changes` | `true` | Commit translated files |
+| `create-pr` | `false` | Open a PR instead of pushing directly |
+| `skip-if-complete` | `true` | Exit early if nothing needs translating |
+| `min-fluency-score` | _(empty)_ | Fail if any string scores below this (1–10) |
+
+### Example
+
+```yaml
+- uses: algebras-ai/algebras-agent/.github/actions/algebras-translate@main
+  with:
+    algebras-api-key: ${{ secrets.ALGEBRAS_API_KEY }}
+    anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+    commit-changes: "true"
+    create-pr: "false"
+```
+
+---
+
 ## Requirements
 
 - Python 3.10+ (for QA tools)

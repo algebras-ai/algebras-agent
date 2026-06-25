@@ -1,0 +1,79 @@
+name: "Algebras Translate"
+description: "Automatically translate your project using the Algebras AI agent with QA fluency scoring."
+branding:
+  icon: "globe"
+  color: "blue"
+
+inputs:
+  algebras-api-key:
+    description: "Algebras API key (from https://platform.algebras.ai/api-keys)"
+    required: true
+
+  llm-provider:
+    description: "LLM provider: 'anthropic', 'openai', or 'gemini'"
+    required: false
+    default: "anthropic"
+
+  anthropic-api-key:
+    description: "Anthropic API key (required if llm-provider is 'anthropic')"
+    required: false
+    default: ""
+
+  openai-api-key:
+    description: "OpenAI API key (required if llm-provider is 'openai')"
+    required: false
+    default: ""
+
+  gemini-api-key:
+    description: "Gemini API key (required if llm-provider is 'gemini')"
+    required: false
+    default: ""
+
+  algebras-platform-url:
+    description: "Override the Algebras platform URL (for self-hosted)"
+    required: false
+    default: "https://platform.algebras.ai"
+
+  commit-changes:
+    description: "Whether to commit translated files back to the repo"
+    required: false
+    default: "true"
+
+  create-pr:
+    description: "Create a PR instead of committing directly to the branch"
+    required: false
+    default: "false"
+
+  skip-if-complete:
+    description: "Skip translation if all strings are already translated"
+    required: false
+    default: "true"
+
+  min-fluency-score:
+    description: "Fail the action if any string scores below this threshold (1–10). Leave empty to disable."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Run Algebras translation agent
+      shell: bash
+      env:
+        INPUT_ALGEBRAS_API_KEY: ${{ inputs.algebras-api-key }}
+        INPUT_LLM_PROVIDER: ${{ inputs.llm-provider }}
+        INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        INPUT_OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        INPUT_GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+        INPUT_ALGEBRAS_PLATFORM_URL: ${{ inputs.algebras-platform-url }}
+        INPUT_COMMIT_CHANGES: ${{ inputs.commit-changes }}
+        INPUT_CREATE_PR: ${{ inputs.create-pr }}
+        INPUT_SKIP_IF_COMPLETE: ${{ inputs.skip-if-complete }}
+        INPUT_MIN_FLUENCY_SCORE: ${{ inputs.min-fluency-score }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "${{ github.action_path }}/translate.sh"
