@@ -10,7 +10,7 @@ inputs:
     required: true
 
   llm-provider:
-    description: "LLM provider: 'anthropic' or 'openai'"
+    description: "LLM provider: 'anthropic', 'openai', or 'gemini'"
     required: false
     default: "anthropic"
 
@@ -21,6 +21,11 @@ inputs:
 
   openai-api-key:
     description: "OpenAI API key (required if llm-provider is 'openai')"
+    required: false
+    default: ""
+
+  gemini-api-key:
+    description: "Gemini API key (required if llm-provider is 'gemini')"
     required: false
     default: ""
 
@@ -64,6 +69,7 @@ runs:
         INPUT_LLM_PROVIDER: ${{ inputs.llm-provider }}
         INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
         INPUT_OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        INPUT_GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
         INPUT_ALGEBRAS_PLATFORM_URL: ${{ inputs.algebras-platform-url }}
         INPUT_COMMIT_CHANGES: ${{ inputs.commit-changes }}
         INPUT_CREATE_PR: ${{ inputs.create-pr }}

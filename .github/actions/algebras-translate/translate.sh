@@ -23,8 +23,13 @@ elif [[ "$INPUT_LLM_PROVIDER" == "openai" ]]; then
     echo "::error::openai-api-key is required when llm-provider is 'openai'"
     exit 1
   fi
+elif [[ "$INPUT_LLM_PROVIDER" == "gemini" ]]; then
+  if [[ -z "${INPUT_GEMINI_API_KEY:-}" ]]; then
+    echo "::error::gemini-api-key is required when llm-provider is 'gemini'"
+    exit 1
+  fi
 else
-  echo "::error::llm-provider must be 'anthropic' or 'openai', got: $INPUT_LLM_PROVIDER"
+  echo "::error::llm-provider must be 'anthropic', 'openai', or 'gemini', got: $INPUT_LLM_PROVIDER"
   exit 1
 fi
 
@@ -123,6 +128,21 @@ elif [[ "$INPUT_LLM_PROVIDER" == "openai" ]]; then
   OPENAI_API_KEY="$INPUT_OPENAI_API_KEY" \
   ALGEBRAS_MCP_CONFIG="$MCP_CONFIG" \
   python3 "$ACTION_PATH/openai_translate.py" AGENTS.md
+  echo "::endgroup::"
+
+elif [[ "$INPUT_LLM_PROVIDER" == "gemini" ]]; then
+  echo "::group::Installing Gemini CLI"
+  npm install -g @google/gemini-cli --quiet
+  echo "::endgroup::"
+
+  echo "::group::Running Gemini translation agent"
+  # Gemini CLI reads GEMINI.md as its system prompt — reuse CLAUDE.md content.
+  cp CLAUDE.md GEMINI.md
+  GEMINI_API_KEY="$INPUT_GEMINI_API_KEY" \
+  gemini \
+    --yolo \
+    --mcp-config "$MCP_CONFIG" \
+    "Translate this project."
   echo "::endgroup::"
 fi
 
