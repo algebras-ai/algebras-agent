@@ -138,11 +138,26 @@ elif [[ "$INPUT_LLM_PROVIDER" == "gemini" ]]; then
   echo "::group::Running Gemini translation agent"
   # Gemini CLI reads GEMINI.md as its system prompt — reuse CLAUDE.md content.
   cp CLAUDE.md GEMINI.md
+  # Gemini CLI configures MCP via .gemini/settings.json (no --mcp-config flag).
+  mkdir -p .gemini
+  ALGEBRAS_API_KEY="$INPUT_ALGEBRAS_API_KEY" \
+  PLATFORM_URL="$INPUT_ALGEBRAS_PLATFORM_URL" \
+  python3 - <<'PYEOF' > .gemini/settings.json
+import json, os
+cfg = {
+    "mcpServers": {
+        "algebras": {
+            "httpUrl": os.environ["PLATFORM_URL"] + "/api/mcp",
+            "headers": {"x-api-key": os.environ["ALGEBRAS_API_KEY"]},
+        }
+    }
+}
+print(json.dumps(cfg, indent=2))
+PYEOF
   GEMINI_API_KEY="$INPUT_GEMINI_API_KEY" \
   gemini \
     --yolo \
-    --mcp-config "$MCP_CONFIG" \
-    "Translate this project."
+    -p "Translate this project."
   echo "::endgroup::"
 fi
 
