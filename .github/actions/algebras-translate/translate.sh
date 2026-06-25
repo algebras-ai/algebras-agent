@@ -157,6 +157,7 @@ PYEOF
   GEMINI_API_KEY="$INPUT_GEMINI_API_KEY" \
   gemini \
     --yolo \
+    --skip-trust \
     -p "Translate this project."
   echo "::endgroup::"
 fi
