@@ -27,6 +27,16 @@ for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md; do
 done
 ```
 
+Also copy the four phase skills (`onboard`, `glossary`, `translate`, `qa`) into the project. These give Claude Code/Codex sessions in this project a real, project-scoped skill to invoke even without the plugin installed, and give tools with no skill mechanism (Cursor, Windsurf) a plain file to read as a fallback, per the router files' "How to run a phase" section:
+
+```bash
+mkdir -p "$PROJECT_ROOT/skills"
+for phase in onboard glossary translate qa; do
+  mkdir -p "$PROJECT_ROOT/skills/$phase"
+  cp -n "${PLUGIN_ROOT}/skills/$phase/SKILL.md" "$PROJECT_ROOT/skills/$phase/SKILL.md" 2>/dev/null || true
+done
+```
+
 Report which files were copied and which were skipped (already existed).
 
 ## Step 2 — Open browser and collect API key
@@ -96,10 +106,16 @@ Print:
 Setup complete.
 
   Workflow files  →  copied to <PROJECT_ROOT>
+  Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,translate,qa}
   API key         →  saved to <PROJECT_ROOT>/.env
   MCP server      →  registered in <Claude or Codex MCP config>
 
 Restart your agent to connect the algebras MCP tools (check_fluency, check_fluency_batch).
 In Codex, use /mcp after restart to confirm the algebras server is active.
+
+This agent runs a four-phase pipeline: onboard → glossary → translate → qa. Invoke each
+phase's skill by name (e.g. `algebras-agent:onboard`) if your session supports skills,
+otherwise follow skills/<phase>/SKILL.md directly — see CLAUDE.md/AGENTS.md for details.
+
 Then say: "Translate this project."
 ```

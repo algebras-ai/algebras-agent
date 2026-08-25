@@ -19,9 +19,9 @@ Reference taxonomy of recurring translation errors. Use this when reviewing tran
 
 ## 2. Glossary / Terminology Inconsistency
 
-**Root problem:** A canonical project term is translated inconsistently across rows.
+**Root problem:** A canonical project term is translated inconsistently across rows, or a term embedded inside a sentence drifts from its own standalone/glossary rendering.
 
-**QA rule:** Enforce mandatory glossary mappings and approved inflections for protected concepts. Run `glossary_qa.py` after every translation session.
+**QA rule:** Enforce mandatory glossary mappings and approved inflections for protected concepts. Run `tools/check_term_consistency.<ext>` — Method A (exact-duplicate source, divergent target) after every batch and at full-corpus scope, and Method B (term-embedding heuristic) the same way. Treat every flagged item as a signal to review, not a verdict — confirm it or log it as a false positive before moving on. See the `translate` skill (3.4) and the `qa` skill (4.2) — `skills/translate/SKILL.md` and `skills/qa/SKILL.md` if skill invocation isn't available.
 
 ---
 
