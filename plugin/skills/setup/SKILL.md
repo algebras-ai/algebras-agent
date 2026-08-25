@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set up the Algebras translation agent — copies workflow files, registers MCP, saves API key
+description: Set up the Algebras translation agent — copies workflow files, registers MCP, resolves and validates the API key (reusing a cached or env-provided key when possible)
 allowed-tools: [Bash, Read, Write, Edit]
 ---
 
@@ -39,24 +39,75 @@ done
 
 Report which files were copied and which were skipped (already existed).
 
-## Step 2 — Open browser and collect API key
+## Step 2 — Resolve the API key
+
+First determine `PLATFORM_URL`: the `ALGEBRAS_PLATFORM_URL` environment variable if set, else an existing `ALGEBRAS_PLATFORM_URL=` line in `PROJECT_ROOT/.env`, else `https://platform.algebras.ai`.
+
+Then look for a usable key, in this order, stopping at the first hit:
+
+1. **Shell environment.** If `ALGEBRAS_API_KEY` is already set in the environment, use it — this covers CI and users who manage secrets themselves.
+2. **This project's `.env`.** If `PROJECT_ROOT/.env` already has a non-empty `ALGEBRAS_API_KEY=` line, use it. Don't make someone re-paste a key just because they're re-running setup on a project they've already configured.
+3. **Global credential cache** (`<home>/.algebras/credentials.json`, see Step 2.2 for how `<home>` is resolved). If it has an entry for `PLATFORM_URL`, tell the user you're reusing the saved key for that platform URL and let them opt out: "Using your saved Algebras key for `<PLATFORM_URL>` — say 'use a different key' if you want to switch."
+4. **Browser + manual paste** (Step 2.1) — only if none of the above produced a key, or the user asked for a different one, or Step 2.3 rejected the key you found.
+
+Whichever key you end up with, always run it through Step 2.3 (validate) before writing anything to disk.
+
+### 2.1 Browser + manual paste (fallback)
 
 Open the Algebras API keys page in the default browser:
 
 ```bash
 # macOS
-open "https://platform.algebras.ai/api-keys"
+open "${PLATFORM_URL}/api-keys"
 # Linux
-xdg-open "https://platform.algebras.ai/api-keys"
+xdg-open "${PLATFORM_URL}/api-keys"
 # Windows
-start "" "https://platform.algebras.ai/api-keys"
+start "" "${PLATFORM_URL}/api-keys"
 ```
 
-If the browser can't be opened, print: "Open this URL to get your API key: https://platform.algebras.ai/api-keys"
+If the browser can't be opened, print: "Open this URL to get your API key: `<PLATFORM_URL>/api-keys`"
 
-Then tell the user: "Your browser should now be open at platform.algebras.ai/api-keys — paste your API key here."
+Then tell the user: "Your browser should now be open at `<PLATFORM_URL>/api-keys` — paste your API key here."
 
-Wait for the user to paste the key. Validate: the value must be non-empty and must not contain spaces. If invalid, ask again. Never print the full key back into the conversation.
+Wait for the user to paste the key. Check: the value must be non-empty and must not contain spaces. If invalid, ask again. Never print the full key back into the conversation.
+
+### 2.2 Global credential cache
+
+Resolve the cache path portably — don't hardcode `~`, it doesn't expand on native Windows shells:
+
+```bash
+CRED_HOME="${HOME:-$USERPROFILE}"
+CRED_FILE="${CRED_HOME}/.algebras/credentials.json"
+```
+
+- Linux / macOS / Git Bash / WSL: `$HOME` is set — use it.
+- Native Windows (PowerShell / cmd, no bash involved): `$HOME` is unset, so this falls back to `$USERPROFILE` (`%USERPROFILE%` / `$env:USERPROFILE`).
+
+`CRED_FILE` maps platform URL → API key, so a key only has to be created once per machine, not once per project:
+
+```json
+{
+  "https://platform.algebras.ai": "<key>",
+  "http://localhost:3000": "<key>"
+}
+```
+
+- **Reading**: if `CRED_FILE` exists, parse it and look up `PLATFORM_URL` as a key.
+- **Writing**: after Step 2.3 successfully validates a key that came from Step 2.1 (a fresh browser+paste), save it to `CRED_FILE` so future `setup` runs on any project skip straight past 2.1. Read the existing file first (if any) so you only add/update the one entry for `PLATFORM_URL` instead of clobbering entries for other platform URLs. Create the parent directory (`mkdir -p`) if it doesn't exist. Use the Write tool, not shell echo, so the key doesn't appear in Bash output.
+- **Permissions**: restrict `CRED_FILE` to the current user where the platform supports it — `chmod 600 "$CRED_FILE"` on Linux/macOS/Git Bash/WSL. This is a POSIX permission bit with no real equivalent on native Windows (NTFS uses ACLs, not mode bits): if `chmod` isn't available or errors, skip it rather than fail the step — a normal per-user Windows profile directory is already private by default. Never fail the whole setup over this.
+- Don't write to the cache when the key came from the shell environment (1) or the project's own `.env` (2) — only a fresh interactive paste needs to be persisted.
+
+### 2.3 Validate the key
+
+Before writing the key anywhere, confirm it actually works with a lightweight authenticated request — this catches a bad paste, a revoked key, or a stale cached/project key immediately, instead of surfacing later as a confusing MCP connection error after restart:
+
+```bash
+status=$(curl -s -o /dev/null -w "%{http_code}" -H "x-api-key: ${KEY}" "${PLATFORM_URL}/api/mcp")
+```
+
+- `401` or `403` → the key is invalid or revoked. Tell the user which source it came from (env / project `.env` / global cache / fresh paste), discard it, and fall back to Step 2.1 to get a fresh one — never silently proceed with a key you know was rejected. If the rejected key came from the global cache, remove that entry once you have a working replacement.
+- Any other status (`200`, `400`, `404`, etc.) → treat it as reachable and proceed. There's no dedicated `/validate` endpoint, so this only proves the key isn't outright rejected by `/api/mcp` — it isn't a full permissions check.
+- If `curl` itself fails (no network, DNS error, etc.), don't block setup on it — warn once and proceed; the real check happens when the MCP connection is used after restart.
 
 ## Step 3 — Save API key to .env
 
@@ -72,13 +123,13 @@ Write the result using the Write tool (not shell echo) so the key value doesn't 
 If running in Claude Code, run the following command to register the algebras MCP server for this project:
 
 ```bash
-claude mcp add --transport http algebras https://platform.algebras.ai/api/mcp --header "x-api-key: <KEY>"
+claude mcp add --transport http algebras "${PLATFORM_URL}/api/mcp" --header "x-api-key: <KEY>"
 ```
 
 If the command output says the server already exists, run it with `--force` to overwrite:
 
 ```bash
-claude mcp add --transport http --force algebras https://platform.algebras.ai/api/mcp --header "x-api-key: <KEY>"
+claude mcp add --transport http --force algebras "${PLATFORM_URL}/api/mcp" --header "x-api-key: <KEY>"
 ```
 
 This writes to `~/.claude.json` scoped to the current project — the correct location Claude Code reads MCP servers from.
@@ -87,7 +138,7 @@ If running in Codex, update `~/.codex/config.toml` instead. Add or replace only 
 
 ```toml
 [mcp_servers.algebras]
-url = "https://platform.algebras.ai/api/mcp"
+url = "<PLATFORM_URL>/api/mcp"
 enabled = true
 http_headers = { "x-api-key" = "<KEY>" }
 ```
@@ -96,7 +147,7 @@ Use the Write or Edit tool so the key does not appear in shell output. This is t
 
 ## Step 5 — Update project.json (non-fatal)
 
-If `PROJECT_ROOT/project.json` exists, read it, set `"mcp_url": "https://platform.algebras.ai/api/mcp"`, and write it back. Skip silently if the file doesn't exist.
+If `PROJECT_ROOT/project.json` exists, read it, set `"mcp_url": "${PLATFORM_URL}/api/mcp"`, and write it back. Skip silently if the file doesn't exist.
 
 ## Step 6 — Final confirmation
 
@@ -107,7 +158,7 @@ Setup complete.
 
   Workflow files  →  copied to <PROJECT_ROOT>
   Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,translate,qa}
-  API key         →  saved to <PROJECT_ROOT>/.env
+  API key         →  validated and saved to <PROJECT_ROOT>/.env (source: <env / project .env / global cache / fresh paste>)
   MCP server      →  registered in <Claude or Codex MCP config>
 
 Restart your agent to connect the algebras MCP tools (check_fluency, check_fluency_batch).
