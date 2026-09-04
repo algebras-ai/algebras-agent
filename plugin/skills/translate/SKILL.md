@@ -12,6 +12,12 @@ allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
 - Requires a glossary that has been through user confirmation (Phase 2, step 2.4) — an intentionally-empty glossary is fine, as long as the user explicitly agreed to proceed without one. If the glossary hasn't been confirmed yet: invoke the `glossary` skill (`algebras-agent:glossary`) first, or read `skills/glossary/SKILL.md`.
 - Never translate against a glossary term still flagged low-confidence — resolve it with the user first.
 
+## Optional: glossary deduplication
+
+Before translating the first batch of the session, if the glossary already has confirmed content (Phase 2): ask the user whether to run a deduplication pass across all glossary terms first, to catch exact duplicates, near-duplicate variants, and conflicting canonical translations before they propagate into translations.
+
+This is optional and must never run without explicit agreement. If the user agrees, invoke the `glossary-dedupe` skill (`algebras-agent:glossary-dedupe`) if skill invocation is available in this session, otherwise read and follow `skills/glossary-dedupe/SKILL.md` in full — it creates the deduplication tool (if one doesn't exist yet) and runs it. If the user declines, skip straight to 3.0.
+
 ## 3.0 Pre-translation checkpoint (large projects)
 
 Before writing the first translation of the session, count the total source segments across all files to be translated.
