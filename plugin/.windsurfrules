@@ -34,6 +34,7 @@ Start at `onboard` for a new project. If `project.json` already exists and is co
 - Keep `forbidden_terms` accurate — don't remove entries to silence real issues.
 - Validate the glossary after every edit.
 - Never rebuild the glossary from scratch unless the user explicitly asks.
+- Optional deduplication across all glossary terms is available once a glossary exists — always ask the user first, never run automatically. See the `translate` skill's pre-batch step, or invoke the `glossary-dedupe` skill (`algebras-agent:glossary-dedupe`) directly at any time.
 
 ### Tool generation
 
