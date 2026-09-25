@@ -1,7 +1,7 @@
 ---
 name: translate
-description: Phase 3 of the Algebras translation workflow (Translation) — translate each batch via the Algebras MCP tools, write it with a generated parser, and run a mid-batch consistency check against everything already translated. Requires a completed project.json and a confirmed glossary.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms]
+description: Phase 3 of the Algebras translation workflow (Translation) — translate each batch via the Algebras MCP tools in three steps (a no-glossary translation, a separate fluency measurement, then the final glossary-applied version that gets written), and run a mid-batch consistency check against everything already translated. Requires a completed project.json and a confirmed glossary.
+allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms]
 ---
 
 # Phase 3 — Translation
@@ -37,30 +37,43 @@ Before translating any batch, declare:
 - Glossary terms that apply to this batch
 - Domain-specific constraints (timing sensitivity, placeholder syntax, profanity intensity, character limits)
 
-## 3.2 Translate
+## 3.2 Translate — three steps per batch
 
-Translate every batch through the `algebras` MCP server's translation tools — never generate the translated text yourself. Chunk each batch to ≤20 texts per call (the API's hard cap on `translate_batch`/`translate_batch_async`); if the batch you declared in 3.1 is larger, sub-chunk it here without changing what counts as "the batch" for 3.4's consistency check.
+Fluency is measured **once**, on the pre-glossary translation, and never again — this is a product decision, not a technical default. Every batch goes through the `algebras` MCP server's tools in exactly this order, as three separate calls — never generate the translated text yourself, never combine steps, and never skip straight to step 3:
 
-Pick the tool per chunk:
-- **`translate_batch`** — the default. Blocks until the whole chunk is done; use this unless you have a specific reason to prefer async.
-- **`translate_batch_async`** + poll `get_translate_batch_async_status` — use when it actually buys you something: a large session where dispatching several chunks (or several target languages) concurrently and polling them while you do other work (writing/QA on an earlier chunk) is faster than waiting on each one in turn, or when you're also requesting `fluency` scoring and want to avoid blocking on the extra evaluation time. There's no fixed size threshold — use your judgment on whether overlapping the wait is worth the extra poll step for the situation at hand.
-- **`translate_text`** — only for a single string (a one-off re-translation after a fix, or a chunk of exactly one).
-- **Agentic pipeline** (`POST /translation/agentic-translate`, then poll `GET /translation/agentic-translate/{id}` with `curl -H "X-Api-Key: $ALGEBRAS_API_KEY" "$ALGEBRAS_PLATFORM_URL/api/v1/translation/agentic-translate..."`) — the one case that's direct HTTP rather than MCP, because no MCP tool wraps it yet. Reserve it for strings where the extra "human-like" quality is worth **4x the credit cost**: hero/marketing copy, or a string QA already flagged as low-fluency that a normal re-translation didn't fix. Don't use it as the default path for ordinary batches.
+**Step 1 — no-glossary translation.** Call `translate_batch` (or `translate_text` for a single string) **without** `glossaryId` and **without** `fluency` (omit it — this is a plain translation call, not the inline-fluency shortcut). This translation is a throwaway — do not write it to the target file, do not show it to the user as the "result." Its only purpose is to feed step 2.
 
-Always pass `glossaryId` = `project.json`'s `glossary_id` (when set) so confirmed terms are enforced automatically, and pass `contexts` (per-text, aligned by index) whenever you have row-level context (`Comment`, `Speaker`, `Addressee`, etc.) that would help the translation — the API doesn't see your project's columns unless you hand it over.
+**Step 2 — measure fluency, as its own call.** Call `check_fluency_batch` (or `check_fluency` for a single string) with `items` built from step 1's `{sourceText, translatedText}` pairs. This is a genuinely separate tool from `translate_batch` — don't use the `fluency: true` inline flag on step 1 instead of this; the two are not interchangeable for this flow, since the point is three distinct, auditable calls. Append one line per string to `tools/fluency_scores.jsonl`:
 
-**Apply glossary terms exactly.** For source terms not yet in the glossary:
+```json
+{"id": "<string/row id>", "sourceLang": "en", "targetLang": "de", "sourceText": "...", "fluency": { "value": 8.4, "idiomatic": 8, "collocational": 9, "discourse": 8, "pragmatic": 9, "calque": 8, "issue_type": "none", "severity": null, "problematic_phrase": null, "suggested_fix": null, "main_issue": null } }
+```
+
+If the API skipped scoring for a given string (it does this for long text), write `"fluency": null` rather than leaving the row out — that tells the `qa` skill's 4.3 the string was genuinely never scored, as opposed to scored-and-good. This log is the **only** source of fluency data from here on — never call `check_fluency`/`check_fluency_batch` again, and never pass `fluency: true` on any translate call, for a string that already has an entry here, even if it gets revised later.
+
+**Step 3 — final, with glossary.** Call `translate_batch`/`translate_text` (or `translate_batch_async` — see below) again on the same texts, this time **with** `glossaryId` set to `project.json`'s `glossary_id`, and without `fluency` — this call's output is what actually gets written in 3.3. Step 1's translation is discarded; only step 3's is kept.
+
+For steps 1 and 3: chunk to ≤20 texts per call (the API's hard cap on `translate_batch`/`translate_batch_async`); step 2's `check_fluency_batch` shares the same 20-item cap, so keep the same chunking across all three steps. If the batch you declared in 3.1 is larger, sub-chunk it here without changing what counts as "the batch" for 3.4's consistency check.
+
+Pick the tool per step, independently:
+- Steps 1 and 3 (`translate_batch` vs `translate_batch_async` + poll `get_translate_batch_async_status`) — `translate_batch` is the default, blocking until done; reach for the async form when dispatching several chunks (or several of these steps) concurrently and polling while you do other work is actually faster than waiting on each in turn. No fixed size threshold — use your judgment.
+- `translate_text`/`check_fluency` — only for a single string (a one-off re-translation after a fix, or a chunk of exactly one). If it's a fresh string with no `tools/fluency_scores.jsonl` entry yet, it still needs its own step-1/step-2/step-3 sequence; if it's a revision of an already-scored string, skip straight to step 3 — it already has a score, and it doesn't get another one.
+- **Agentic pipeline** (`POST /translation/agentic-translate`, then poll `GET /translation/agentic-translate/{id}` with `curl -H "X-Api-Key: $ALGEBRAS_API_KEY" "$ALGEBRAS_PLATFORM_URL/api/v1/translation/agentic-translate..."`) — the one case that's direct HTTP rather than MCP, because no MCP tool wraps it yet. Reserve it for the step-3 (glossary) call on strings where the extra "human-like" quality is worth **4x the credit cost** — hero/marketing copy. Steps 1-2 (the fluency baseline) still come from ordinary `translate_batch`/`check_fluency_batch` calls as above; don't call `check_fluency` again afterward to score the agentic result — per the no-second-measurement rule, once a string has a step-2 score, that's its only score.
+
+Pass `contexts` (per-text, aligned by index) on both translate steps whenever you have row-level context (`Comment`, `Speaker`, `Addressee`, etc.) that would help the translation — the API doesn't see your project's columns unless you hand it over.
+
+**Apply glossary terms exactly (step 3).** For source terms not yet in the glossary:
 1. Search the web for established translations before coining your own.
 2. If a reliable translation exists, create it immediately via `create_glossary_term` (see the `glossary` skill's 2.5 for the shape) rather than waiting until end of batch — later texts in this same session should get to use it too.
 3. If you're unsure, flag the term and ask the user before translating.
 
-The API returns translated text; it doesn't know your project's markup conventions unless you tell it. After each response, verify yourself: all tags `<...>`, placeholders `{...}`, variables, numbers, and markup preserved exactly; speaker intent, addressee (singular/plural), register, and intensity matched. Use `prompt` on the translate call to steer this (e.g. "preserve all `{placeholder}` tokens exactly") when a chunk needs it, and re-translate (`translate_text`) any result that got it wrong rather than hand-editing the API's output yourself.
+The API returns translated text; it doesn't know your project's markup conventions unless you tell it. After step 3's response, verify yourself: all tags `<...>`, placeholders `{...}`, variables, numbers, and markup preserved exactly; speaker intent, addressee (singular/plural), register, and intensity matched. Use `prompt` on the translate call to steer this (e.g. "preserve all `{placeholder}` tokens exactly") when a chunk needs it, and re-translate (`translate_text`, with `glossaryId` and no `fluency`) any result that got it wrong rather than hand-editing the API's output yourself — this is a step-3 fix, not a new step 1/2.
 
 For credits: translate roles and departments; preserve person names, company names, engine names, and middleware names unchanged — use `prompt` to convey this per chunk if the default output isn't respecting it.
 
 ## 3.3 Parse and write using generated tools
 
-Use the parser from Phase 1 to write results. Write only the target language field/column for the requested rows. Never overwrite source text or other columns. If no suitable tool exists, generate one before writing.
+Use the parser from Phase 1 to write results. Write only step 3's (glossary-applied) output — never step 1's throwaway translation. Write only the target language field/column for the requested rows. Never overwrite source text or other columns. If no suitable tool exists, generate one before writing.
 
 Verify the exact edited cells by parsing the file again after writing.
 

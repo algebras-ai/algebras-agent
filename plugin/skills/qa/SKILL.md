@@ -1,7 +1,7 @@
 ---
 name: qa
-description: Phase 4 of the Algebras translation workflow (QA Review) — local QA, full-corpus terminology consistency, Algebras fluency scoring, and reviewer-agent proofreading. Requires at least one batch already translated and written to disk.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch]
+description: Phase 4 of the Algebras translation workflow (QA Review) — local QA, full-corpus terminology consistency, reporting the fluency baseline already captured during translation, and reviewer-agent proofreading. Requires at least one batch already translated and written to disk.
+allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms]
 ---
 
 # Phase 4 — QA Review
@@ -42,38 +42,21 @@ If this tool doesn't exist yet, generate it before the first batch (ideally at t
 
 **Merge with the running log**: read `tools/consistency_findings.jsonl` (populated by every 3.4 run this session) and deduplicate against the fresh full-scope findings by source+context+language. Resolve every item still `open`: fix it, ask the user, or record an explicit accepted exception with rationale — the same false-positive-review discipline from 3.4 applies here too. Don't move on with an `open` item unresolved.
 
-## 4.3 Fluency QA (via Algebras MCP)
+## 4.3 Fluency (already measured during translation)
 
-Use `check_fluency_batch` when scoring multiple strings (up to 20 per call). Use `check_fluency` only for a single string or when re-checking a revised translation.
+Fluency is measured exactly once per string, by the `translate` skill's 3.2 step 2 (`check_fluency_batch`/`check_fluency`, called separately from the step-1 no-glossary translation) — before this phase ever runs. **Never call `check_fluency`/`check_fluency_batch` again, and never pass `fluency: true` on a translate call, for a string that already has an entry in `tools/fluency_scores.jsonl`** — that includes strings you're about to revise in 4.4. This phase's job is to read and report that log, not to generate new scores.
 
-```
-Tool: check_fluency_batch
-Input:
-  sourceLang: <source language code>
-  targetLang: <target language code>
-  items:
-    - sourceText: <original string>
-      translatedText: <translated string>
-    - ...  # up to 20 pairs per call
-```
+Read `tools/fluency_scores.jsonl` for the rows/languages in scope. Apply the same score bands to what's already there, for context when deciding what else to flag:
 
-```
-Tool: check_fluency          # single string only / re-check after revision
-Input:
-  sourceLang: <source language code>
-  targetLang: <target language code>
-  sourceText: <original string>
-  translatedText: <translated string>
-```
-
-| Score | Action |
+| Score | Meaning |
 |---|---|
-| 8–10 | Ship as-is |
-| 6–7 | Minor polish optional |
-| 4–5 | Revise — address `main_issue` and `suggested_fix` |
-| 1–3 | Retranslate |
+| 8–10 | Strong |
+| 6–7 | Minor issues |
+| 4–5 | Notable issues (`main_issue`/`suggested_fix` on the logged entry) |
+| 1–3 | Weak |
+| `null` | Skipped by the API (long text) — report as unscored, not as a failure |
 
-When `fluency < 6`: revise, call `check_fluency` again to confirm improvement. Document persistent issues for user review. Prioritize: `calque`, `false_friend`, `register_mismatch` — these usually need a full phrase rewrite.
+These scores describe step 1's *pre-glossary* translation, not the step-3, glossary-applied text that was actually written in 3.3 — the two can read differently. Treat the log as a diagnostic about the underlying translation quality independent of glossary effects, not a gate on the shipped text: **do not revise a string because of its fluency score, and do not re-score anything here.** A string revised for another reason (a consistency finding, a reviewer-flagged fix) keeps its original score in the log — it does not get a new one.
 
 ## 4.4 Reviewer agent (multi-agent proofreading)
 
@@ -93,7 +76,7 @@ Reviewer agents must not edit files. They report findings in this format:
 
 Include in the approval table: high-confidence `definite_fix` findings, repeated pattern fixes, QA failures, `needs_user_decision` items. Reject: purely subjective rewrites, suggestions that break tags/placeholders/numbers, suggestions that ignore context columns.
 
-Apply only user-approved edits. Re-run QA after applying. Report results.
+Apply only user-approved edits. Re-run 4.1's local QA and 4.2's consistency checks on the edited rows — not fluency; an edited string keeps its original 4.3 score rather than getting a new one. Report results.
 
 ## 4.5 Final report
 
@@ -101,7 +84,7 @@ After each batch:
 - Row range and languages processed
 - QA findings by type and count
 - Consistency QA: Method A / Method B / glossary-anchored findings — confirmed, false-positive, fixed-inline, and still-open counts
-- Fluency scores (min, mean, any below 6)
+- Fluency scores from `tools/fluency_scores.jsonl` (min, mean, any below 6, any `null`/unscored) — labeled as the pre-glossary baseline, not a score of the shipped text
 - Edits applied
 - Remaining issues for user review
 
