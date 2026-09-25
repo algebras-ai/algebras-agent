@@ -46,11 +46,13 @@ Write `project.json` based on what you've discovered. Do not copy a template —
     "<lang_code>": "<column name / key>"
   },
   "non_latin_langs": [],
-  "glossary_dir": "glossary",
+  "glossary_id": null,
   "mcp_url": "https://platform.algebras.ai/api/mcp",
   "notes": "<any other project-specific context worth remembering>"
 }
 ```
+
+`glossary_id` stays `null` here — the `glossary` skill (Phase 2) creates the glossary on the Algebras platform and fills this in. There is no local glossary directory or file to set up.
 
 If you can't determine a field with confidence, prompt the user:
 

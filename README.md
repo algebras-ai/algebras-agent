@@ -133,9 +133,9 @@ On each run the action:
 | Input | Default | Description |
 |-------|---------|-------------|
 | `algebras-api-key` | — | **Required.** Algebras API key |
-| `llm-provider` | `anthropic` | `anthropic` or `openai` |
+| `llm-provider` | `anthropic` | `anthropic` or `gemini` |
 | `anthropic-api-key` | — | Required if provider is `anthropic` |
-| `openai-api-key` | — | Required if provider is `openai` |
+| `gemini-api-key` | — | Required if provider is `gemini` |
 | `algebras-platform-url` | `https://platform.algebras.ai` | Override for self-hosted |
 | `commit-changes` | `true` | Commit translated files |
 | `create-pr` | `false` | Open a PR instead of pushing directly |

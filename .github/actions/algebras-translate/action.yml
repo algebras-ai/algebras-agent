@@ -10,17 +10,12 @@ inputs:
     required: true
 
   llm-provider:
-    description: "LLM provider: 'anthropic', 'openai', or 'gemini'"
+    description: "LLM provider: 'anthropic' or 'gemini'"
     required: false
     default: "anthropic"
 
   anthropic-api-key:
     description: "Anthropic API key (required if llm-provider is 'anthropic')"
-    required: false
-    default: ""
-
-  openai-api-key:
-    description: "OpenAI API key (required if llm-provider is 'openai')"
     required: false
     default: ""
 
@@ -68,12 +63,10 @@ runs:
         INPUT_ALGEBRAS_API_KEY: ${{ inputs.algebras-api-key }}
         INPUT_LLM_PROVIDER: ${{ inputs.llm-provider }}
         INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
-        INPUT_OPENAI_API_KEY: ${{ inputs.openai-api-key }}
         INPUT_GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
         INPUT_ALGEBRAS_PLATFORM_URL: ${{ inputs.algebras-platform-url }}
         INPUT_COMMIT_CHANGES: ${{ inputs.commit-changes }}
         INPUT_CREATE_PR: ${{ inputs.create-pr }}
         INPUT_SKIP_IF_COMPLETE: ${{ inputs.skip-if-complete }}
         INPUT_MIN_FLUENCY_SCORE: ${{ inputs.min-fluency-score }}
-        ACTION_PATH: ${{ github.action_path }}
       run: bash "${{ github.action_path }}/translate.sh"

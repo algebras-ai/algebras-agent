@@ -35,8 +35,8 @@ jobs:
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 
           # ── Provider (default: anthropic) ───────────────────────────────────
-          # llm-provider: "anthropic"   # or "openai"
-          # openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          # llm-provider: "anthropic"   # or "gemini"
+          # gemini-api-key: ${{ secrets.GEMINI_API_KEY }}
 
           # ── Commit behaviour ────────────────────────────────────────────────
           commit-changes: "true"
