@@ -6,8 +6,8 @@ This agent helps human translators produce the best possible machine translation
 |---|---|---|---|
 | 1 | `onboard` | Discover files, understand the domain, generate `project.json` and parsers | None — entry point |
 | 2 | `glossary` | Extract, research, and confirm project terminology | Complete `project.json` |
-| 3 | `translate` | Translate, write, and mid-batch consistency-check each batch | Complete `project.json` + confirmed glossary |
-| 4 | `qa` | Local QA, full-corpus consistency, fluency scoring, reviewer pass | At least one batch already translated |
+| 3 | `translate` | Translate each batch in three steps — no-glossary translation, separate fluency measurement, then the final glossary-applied translation that gets written — and mid-batch consistency-check it | Complete `project.json` + confirmed glossary |
+| 4 | `qa` | Local QA, full-corpus consistency, reviewer pass, and reporting the fluency baseline `translate` already captured (never re-measured) | At least one batch already translated |
 
 The agent is format-agnostic. Do not assume any particular file extension, column structure, or glossary format. Generate tools and config on demand as you learn the project.
 
