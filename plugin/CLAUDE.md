@@ -30,10 +30,9 @@ Start at `onboard` for a new project. If `project.json` already exists and is co
 
 ### Glossary
 
-- Add valid inflected forms to `allowed_terms` when QA flags a correct translation.
-- Keep `forbidden_terms` accurate — don't remove entries to silence real issues.
-- Validate the glossary after every edit.
-- Never rebuild the glossary from scratch unless the user explicitly asks.
+- Glossaries live on the Algebras platform, not as local files. Create, read, update, and delete terms through the `algebras` MCP server's glossary tools (`create_glossary_term`, `list_glossary_terms`, `update_glossary_term`, `delete_glossary_term`, etc.), and keep the working glossary's id in `project.json`'s `glossary_id`.
+- Add valid inflected forms as their own term definitions when QA flags a correct translation.
+- Never rebuild the glossary from scratch unless the user explicitly asks — update or delete individual terms instead.
 - Optional deduplication across all glossary terms is available once a glossary exists — always ask the user first, never run automatically. See the `translate` skill's pre-batch step, or invoke the `glossary-dedupe` skill (`algebras-agent:glossary-dedupe`) directly at any time.
 
 ### Tool generation

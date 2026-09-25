@@ -43,11 +43,13 @@ Write `project.json` based on what you've discovered. Do not copy a template —
     "<lang_code>": "<column name / key>"
   },
   "non_latin_langs": [],
-  "glossary_dir": "glossary",
+  "glossary_id": null,
   "mcp_url": "https://platform.algebras.ai/api/mcp",
   "notes": "<any other project-specific context worth remembering>"
 }
 ```
+
+`glossary_id` stays `null` here — Phase 2 creates the glossary on the Algebras platform and fills this in. There is no local glossary directory or file.
 
 If you can't determine a field with confidence, prompt the user:
 
@@ -83,18 +85,11 @@ Do not start Phase 2 until the user confirms or corrects this summary.
 
 ## Phase 2 — Glossary Bootstrap
 
+Glossaries are not local files. They live on the Algebras platform, managed through the `algebras` MCP server's glossary tools (`list_glossaries`, `create_glossary`, `get_glossary`, `create_glossary_term`, `bulk_create_glossary_terms`, `update_glossary_term`, `delete_glossary_term`, `list_glossary_terms`), and referenced from translation calls by `glossaryId`.
+
 ### 2.1 Check glossary state
 
-Check whether the glossary has usable content. The glossary structure is whatever the user prefers — the agent adapts. If no glossary exists:
-
-> "No glossary found. How would you like to store it?
-> - **Two-file TSV** (`concepts.tsv` + `terms.tsv`) — structured, machine-checkable
-> - **JSON** — good for programmatic access
-> - **Flat list** — term + translation pairs, one per line
->
-> I'll adapt to any format. No preference? I'll use two-file TSV."
-
-Generate `glossary/README.md` documenting the chosen format so future sessions know the schema.
+If `project.json`'s `glossary_id` is already set, call `get_glossary` with it and use that as the current state. If it's `null`: call `list_glossaries` first to avoid creating a duplicate for a project that already has one, otherwise call `create_glossary` with a name derived from the project and `languages` set to `source_lang` plus every `target_langs` entry. Write the returned `id` into `project.json`'s `glossary_id` right away.
 
 ### 2.2 Extract candidate terms
 
@@ -113,12 +108,12 @@ For each candidate term, use web search to find whether an official or widely-us
 
 - Search: `"<term>" translation <target language>` and `"<term>" <target language> official localization`
 - Prefer: publisher/vendor official localizations → widely-adopted community translations → professional dictionaries
-- If multiple translations coexist, record the most authoritative as `canonical_term` and the others as variants
-- If a translation is known to be misleading, mark it `forbidden`
+- If multiple translations coexist, pick the most authoritative one to propose — the platform's glossary schema has no separate "variants" slot.
+- If a translation is known to be misleading, don't create a term for it — there's no `forbidden` concept on the platform; just flag the risk for the QA phase instead.
 
 ### 2.4 Confirm with user
 
-Present your proposals before writing anything to disk. For terms where you're uncertain (confidence = low), flag them explicitly:
+Present your proposals before creating anything. For terms where you're uncertain (confidence = low), flag them explicitly:
 
 > | # | Source term | Definition | [de] | [fr] | Confidence |
 > |---|---|---|---|---|---|
@@ -127,11 +122,11 @@ Present your proposals before writing anything to disk. For terms where you're u
 >
 > **Actions**: Accept all / Edit a row (reply with row number + correction) / Skip a term / Add a term
 
-Do not add terms to the glossary until the user accepts them. Terms with low confidence must be resolved before translation starts. If the user rejects a suggestion, record the correct form and the reason.
+Do not create a glossary term until the user accepts it. Terms with low confidence must be resolved before translation starts. If the user rejects a suggestion, record the correct form and the reason.
 
-### 2.5 Write and validate the glossary
+### 2.5 Create the terms
 
-Write confirmed terms in the chosen format. Generate a validation tool (`tools/validate_glossary.<ext>`) if none exists. Run validation and fix any schema errors before proceeding.
+Each accepted row becomes one glossary term with one `definitions[]` entry per language (`language`, `term` = the rendering in that language, `definition` = a short language-neutral gloss reused across languages). Push accepted rows from this session in one `bulk_create_glossary_terms` call against `glossary_id` (or `create_glossary_term` for a single term added mid-translation). Check the response for partial failures and surface them to the user — the platform enforces the schema on write, so there's no separate local validation step.
 
 ---
 
@@ -146,16 +141,24 @@ Before translating any batch, declare:
 
 ### 3.2 Translate
 
-Translate using your own language knowledge. Do not call external translation APIs or machine-translation services.
+Translate every batch through the `algebras` MCP server's translation tools — never generate the translated text yourself. Chunk each batch to ≤20 texts per call (the API's hard cap).
+
+Pick the tool per chunk:
+- **`translate_batch`** — the default; blocks until the chunk is done.
+- **`translate_batch_async`** + poll `get_translate_batch_async_status` — use when overlapping the wait actually helps (dispatching several chunks/languages concurrently, or requesting `fluency` scoring alongside translation). No fixed size rule — use your judgment.
+- **`translate_text`** — single-string re-translations only.
+- **Agentic pipeline** (`POST /translation/agentic-translate`, then poll `GET /translation/agentic-translate/{id}` via `curl -H "X-Api-Key: $ALGEBRAS_API_KEY" "$ALGEBRAS_PLATFORM_URL/api/v1/translation/agentic-translate..."`) — the one direct-HTTP case, since no MCP tool wraps it. Reserve for high-value strings or QA-flagged low-fluency retranslations; it costs **4x** a normal call.
+
+Always pass `glossaryId` = `project.json`'s `glossary_id` and `contexts` (per-text, aligned by index) whenever row-level context would help.
 
 **Apply glossary terms exactly.** For source terms not yet in the glossary:
 1. Search the web for established translations before coining your own.
-2. If a reliable translation exists, use it and add the term to the glossary.
+2. If a reliable translation exists, create it immediately via `create_glossary_term` (see Phase 2's 2.5) rather than waiting until end of batch.
 3. If you're unsure, flag the term and ask the user before translating.
 
-Preserve all tags `<...>`, placeholders `{...}`, variables, numbers, and markup exactly. Match speaker intent, addressee (singular/plural), register, and intensity.
+The API doesn't know your project's markup conventions unless you tell it — after each response, verify yourself: all tags `<...>`, placeholders `{...}`, variables, numbers, and markup preserved exactly; speaker intent, addressee, register, and intensity matched. Use `prompt` to steer a chunk (e.g. "preserve all `{placeholder}` tokens exactly") and re-translate via `translate_text` rather than hand-editing the API's output.
 
-For credits: translate roles and departments; preserve person names, company names, engine names, and middleware names unchanged.
+For credits: translate roles and departments; preserve person names, company names, engine names, and middleware names unchanged — convey this via `prompt` if needed.
 
 ### 3.3 Parse and write using generated tools
 
@@ -170,7 +173,7 @@ Verify the exact edited cells by parsing the file again after writing.
 ### 4.1 Local QA
 
 After each translation batch, run all available tools in `tools/`. Common checks:
-- **Glossary terminology** — terms used correctly
+- **Glossary terminology** — terms used correctly; fetch current terms via the `list_glossary_terms` MCP tool against `project.json`'s `glossary_id` (the glossary is a platform record, not a local file) and match against each term's per-language `definitions[].term`
 - **Length expansion** — text length within safe bounds
 - **Numeric preservation** — all numbers match source
 - **Mixed-language / source leakage** — no untranslated segments
@@ -253,10 +256,9 @@ After each batch:
 
 ### Glossary
 
-- Add valid inflected forms to `allowed_terms` when QA flags a correct translation.
-- Keep `forbidden_terms` accurate — don't remove entries to silence real issues.
-- Validate the glossary after every edit.
-- Never rebuild the glossary from scratch unless the user explicitly asks.
+- Glossaries live on the Algebras platform, not as local files. Create, read, update, and delete terms through the `algebras` MCP server's glossary tools (`create_glossary_term`, `list_glossary_terms`, `update_glossary_term`, `delete_glossary_term`, etc.), and keep the working glossary's id in `project.json`'s `glossary_id`.
+- Add valid inflected forms as their own term definitions when QA flags a correct translation.
+- Never rebuild the glossary from scratch unless the user explicitly asks — update or delete individual terms instead.
 
 ### Tool generation
 

@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Phase 4 of the Algebras translation workflow (QA Review) — local QA, full-corpus terminology consistency, Algebras fluency scoring, and reviewer-agent proofreading. Requires at least one batch already translated and written to disk.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, Agent]
+allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch]
 ---
 
 # Phase 4 — QA Review
@@ -36,7 +36,7 @@ If this tool doesn't exist yet, generate it before the first batch (ideally at t
 
 - **Method A — exact-duplicate source check**: group all segments by identical source text across all files/languages. Any group where the same exact source text has 2+ distinct target renderings is a confirmed inconsistency — this check has effectively no false positives.
 - **Method B — term-embedding check**: for every candidate term that also appears as a standalone segment somewhere (source text == the term exactly), treat that segment's target as the canonical rendering. Every other segment whose source text contains the term as a whole word should have a target that contains the canonical rendering (tolerant of inflection/word order). Mismatches are a heuristic signal for human review, not a hard fact — expect more false positives on short, polysemous single words than on multi-word proper nouns/ability names.
-- **Glossary-anchored check**: independently of in-corpus canonical terms, check every segment that contains an approved glossary term against the glossary's approved translation(s) for the current target language.
+- **Glossary-anchored check**: independently of in-corpus canonical terms, check every segment that contains an approved glossary term against the glossary's approved translation(s) for the current target language. The glossary is the Algebras platform record, not a local file — fetch current terms via the `list_glossary_terms` MCP tool against `project.json`'s `glossary_id` (cache the result for the run rather than re-fetching per segment) and match against each term's per-language `definitions[].term`.
 
 **Sizing mode**: for large projects (see the `translate` skill's 3.0 threshold), the tool should maintain an incremental cache (e.g. `tools/.consistency_cache.json` — source-text → seen targets, canonical term → stems) instead of re-parsing the whole corpus on every call. Treat the cache as disposable derived data: safe to delete, rebuilt automatically on the next run. Small projects can just rescan everything each time — simpler, and cheap at that scale.
 

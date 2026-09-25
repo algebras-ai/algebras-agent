@@ -1,7 +1,7 @@
 ---
 name: translate
-description: Phase 3 of the Algebras translation workflow (Translation) — translate each batch, write it with a generated parser, and run a mid-batch consistency check against everything already translated. Requires a completed project.json and a confirmed glossary.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch]
+description: Phase 3 of the Algebras translation workflow (Translation) — translate each batch via the Algebras MCP tools, write it with a generated parser, and run a mid-batch consistency check against everything already translated. Requires a completed project.json and a confirmed glossary.
+allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms]
 ---
 
 # Phase 3 — Translation
@@ -39,16 +39,24 @@ Before translating any batch, declare:
 
 ## 3.2 Translate
 
-Translate using your own language knowledge. Do not call external translation APIs or machine-translation services.
+Translate every batch through the `algebras` MCP server's translation tools — never generate the translated text yourself. Chunk each batch to ≤20 texts per call (the API's hard cap on `translate_batch`/`translate_batch_async`); if the batch you declared in 3.1 is larger, sub-chunk it here without changing what counts as "the batch" for 3.4's consistency check.
+
+Pick the tool per chunk:
+- **`translate_batch`** — the default. Blocks until the whole chunk is done; use this unless you have a specific reason to prefer async.
+- **`translate_batch_async`** + poll `get_translate_batch_async_status` — use when it actually buys you something: a large session where dispatching several chunks (or several target languages) concurrently and polling them while you do other work (writing/QA on an earlier chunk) is faster than waiting on each one in turn, or when you're also requesting `fluency` scoring and want to avoid blocking on the extra evaluation time. There's no fixed size threshold — use your judgment on whether overlapping the wait is worth the extra poll step for the situation at hand.
+- **`translate_text`** — only for a single string (a one-off re-translation after a fix, or a chunk of exactly one).
+- **Agentic pipeline** (`POST /translation/agentic-translate`, then poll `GET /translation/agentic-translate/{id}` with `curl -H "X-Api-Key: $ALGEBRAS_API_KEY" "$ALGEBRAS_PLATFORM_URL/api/v1/translation/agentic-translate..."`) — the one case that's direct HTTP rather than MCP, because no MCP tool wraps it yet. Reserve it for strings where the extra "human-like" quality is worth **4x the credit cost**: hero/marketing copy, or a string QA already flagged as low-fluency that a normal re-translation didn't fix. Don't use it as the default path for ordinary batches.
+
+Always pass `glossaryId` = `project.json`'s `glossary_id` (when set) so confirmed terms are enforced automatically, and pass `contexts` (per-text, aligned by index) whenever you have row-level context (`Comment`, `Speaker`, `Addressee`, etc.) that would help the translation — the API doesn't see your project's columns unless you hand it over.
 
 **Apply glossary terms exactly.** For source terms not yet in the glossary:
 1. Search the web for established translations before coining your own.
-2. If a reliable translation exists, use it and add the term to the glossary.
+2. If a reliable translation exists, create it immediately via `create_glossary_term` (see the `glossary` skill's 2.5 for the shape) rather than waiting until end of batch — later texts in this same session should get to use it too.
 3. If you're unsure, flag the term and ask the user before translating.
 
-Preserve all tags `<...>`, placeholders `{...}`, variables, numbers, and markup exactly. Match speaker intent, addressee (singular/plural), register, and intensity.
+The API returns translated text; it doesn't know your project's markup conventions unless you tell it. After each response, verify yourself: all tags `<...>`, placeholders `{...}`, variables, numbers, and markup preserved exactly; speaker intent, addressee (singular/plural), register, and intensity matched. Use `prompt` on the translate call to steer this (e.g. "preserve all `{placeholder}` tokens exactly") when a chunk needs it, and re-translate (`translate_text`) any result that got it wrong rather than hand-editing the API's output yourself.
 
-For credits: translate roles and departments; preserve person names, company names, engine names, and middleware names unchanged.
+For credits: translate roles and departments; preserve person names, company names, engine names, and middleware names unchanged — use `prompt` to convey this per chunk if the default output isn't respecting it.
 
 ## 3.3 Parse and write using generated tools
 

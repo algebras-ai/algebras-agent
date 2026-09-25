@@ -18,18 +18,13 @@ if [[ "$INPUT_LLM_PROVIDER" == "anthropic" ]]; then
     echo "::error::anthropic-api-key is required when llm-provider is 'anthropic'"
     exit 1
   fi
-elif [[ "$INPUT_LLM_PROVIDER" == "openai" ]]; then
-  if [[ -z "${INPUT_OPENAI_API_KEY:-}" ]]; then
-    echo "::error::openai-api-key is required when llm-provider is 'openai'"
-    exit 1
-  fi
 elif [[ "$INPUT_LLM_PROVIDER" == "gemini" ]]; then
   if [[ -z "${INPUT_GEMINI_API_KEY:-}" ]]; then
     echo "::error::gemini-api-key is required when llm-provider is 'gemini'"
     exit 1
   fi
 else
-  echo "::error::llm-provider must be 'anthropic', 'openai', or 'gemini', got: $INPUT_LLM_PROVIDER"
+  echo "::error::llm-provider must be 'anthropic' or 'gemini', got: $INPUT_LLM_PROVIDER"
   exit 1
 fi
 
@@ -39,6 +34,12 @@ echo "::group::Downloading workflow files"
 for f in CLAUDE.md AGENTS.md COMMON_MISTAKES.md; do
   curl -fsSL "$GITHUB_RAW/$f" -o "$f"
   echo "  Downloaded $f"
+done
+mkdir -p skills
+for phase in onboard glossary glossary-dedupe translate qa; do
+  mkdir -p "skills/$phase"
+  curl -fsSL "$GITHUB_RAW/skills/$phase/SKILL.md" -o "skills/$phase/SKILL.md"
+  echo "  Downloaded skills/$phase/SKILL.md"
 done
 echo "::endgroup::"
 
@@ -117,17 +118,6 @@ if [[ "$INPUT_LLM_PROVIDER" == "anthropic" ]]; then
     --mcp-config "$MCP_CONFIG" \
     --system-prompt-file CLAUDE.md \
     "Translate this project."
-  echo "::endgroup::"
-
-elif [[ "$INPUT_LLM_PROVIDER" == "openai" ]]; then
-  echo "::group::Installing OpenAI SDK"
-  pip install openai --quiet
-  echo "::endgroup::"
-
-  echo "::group::Running OpenAI translation agent"
-  OPENAI_API_KEY="$INPUT_OPENAI_API_KEY" \
-  ALGEBRAS_MCP_CONFIG="$MCP_CONFIG" \
-  python3 "$ACTION_PATH/openai_translate.py" AGENTS.md
   echo "::endgroup::"
 
 elif [[ "$INPUT_LLM_PROVIDER" == "gemini" ]]; then

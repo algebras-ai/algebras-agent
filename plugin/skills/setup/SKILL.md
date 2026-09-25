@@ -198,7 +198,7 @@ Setup complete.
   API key         →  validated and saved to <PROJECT_ROOT>/.env (source: <env / project .env / global cache / device auth / fresh paste>)
   MCP server      →  registered in <Claude or Codex MCP config>
 
-Restart your agent to connect the algebras MCP tools (check_fluency, check_fluency_batch).
+Restart your agent to connect the algebras MCP tools (translation: translate_text, translate_batch, translate_batch_async; glossaries: create_glossary, create_glossary_term, list_glossary_terms, etc.; QA: check_fluency, check_fluency_batch).
 In Codex, use /mcp after restart to confirm the algebras server is active.
 
 This agent runs a four-phase pipeline: onboard → glossary → translate → qa. Invoke each
