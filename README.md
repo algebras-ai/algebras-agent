@@ -32,7 +32,7 @@ claude
 The MCP server connects automatically once the plugin has your API key (declared in `plugin.json`). If you need to reconfigure the key later:
 
 ```
-/plugin configure algebras-agent@algebras-agent
+/plugin configure algebras-agent
 /reload-plugins
 ```
 

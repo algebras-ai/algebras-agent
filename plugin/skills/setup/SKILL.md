@@ -157,7 +157,21 @@ Write the result using the Write tool (not shell echo) so the key value doesn't 
 
 ## Step 4 — Register MCP server
 
-If running in Claude Code, run the following command to register the algebras MCP server for this project:
+### Plugin users (Claude Code with the `algebras-agent` plugin installed)
+
+Check whether the Algebras plugin is loaded by looking for `plugin:algebras-agent:algebras` in the MCP server list. If it is present, **skip `claude mcp add` entirely** — the plugin's declarative `mcpServers` config handles MCP registration automatically via `pluginUserConfig`. Running `claude mcp add` would create a duplicate manual entry that conflicts with the plugin's own server.
+
+If the plugin is installed but the MCP server is failing (e.g. "JSON Parse error" or empty API key), tell the user to reconfigure the plugin:
+
+```
+/plugin configure algebras-agent
+```
+
+This prompts for the API key and platform URL, which the plugin injects into its MCP server config via template substitution.
+
+### Non-plugin users (Claude Code without the plugin)
+
+Run the following command to register the algebras MCP server for this project:
 
 ```bash
 claude mcp add --transport http algebras "${PLATFORM_URL}/api/mcp" --header "x-api-key: <KEY>"
@@ -170,6 +184,8 @@ claude mcp add --transport http --force algebras "${PLATFORM_URL}/api/mcp" --hea
 ```
 
 This writes to `~/.claude.json` scoped to the current project — the correct location Claude Code reads MCP servers from.
+
+### Codex
 
 If running in Codex, update `~/.codex/config.toml` instead. Add or replace only this block, preserving all other Codex config:
 
