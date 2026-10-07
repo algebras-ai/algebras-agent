@@ -8,21 +8,12 @@
   },
   "homepage": "https://platform.algebras.ai",
   "license": "MIT",
-  "userConfig": [
-    {
-      "id": "algebras_api_key",
-      "label": "Algebras API Key",
+  "userConfig": {
+    "algebras_api_key": {
+      "type": "string",
+      "title": "Algebras API Key",
       "description": "API key from https://platform.algebras.ai/api-keys",
       "sensitive": true
     }
-  ],
-  "allowedTools": {
-    "bash": ["python"],
-    "read": true,
-    "write": ["project.json", "project/**"],
-    "webfetch": [
-      "platform.algebras.ai",
-      "docs.algebras.ai"
-    ]
   }
 }
