@@ -1,7 +1,7 @@
 ---
 name: translate
 description: Phase 3 of the Algebras translation workflow (Translation) — translate each batch via the Algebras MCP tools in three steps (a no-glossary translation, a separate fluency measurement, then the final glossary-applied version that gets written), and run a mid-batch consistency check against everything already translated. Requires a completed project.json and a confirmed glossary.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms]
+allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms]
 ---
 
 # Phase 3 — Translation
@@ -87,10 +87,11 @@ tools/check_term_consistency.<ext> --scope batch --batch <ids/range>
 
 If this tool doesn't exist yet, generate it now — see the `qa` skill's 4.2 for the full method specification. It must be generic and format-agnostic, built on top of the Phase 1 parser, and support both `--scope full` and `--scope batch`.
 
-This applies two checks — full method descriptions are in the `qa` skill's 4.2 — restricted to the rows in the batch just written, compared against everything already translated for that language (prior batches, other files, and the glossary):
+This applies three checks — full method descriptions are in the `qa` skill's 4.2 — restricted to the rows in the batch just written, compared against everything already translated for that language (prior batches, other files, and the glossary):
 
 - **Method A** (exact-duplicate source, zero heuristics): the batch's source strings that also occur elsewhere in the corpus must have the same target rendering everywhere.
 - **Method B** (term-embedding, heuristic): terms with an established canonical rendering elsewhere in the corpus must be rendered consistently when embedded inside this batch's sentences.
+- **Glossary compliance** (via `count_glossary_terms`): for each segment in the batch, call `count_glossary_terms` with `project.json`'s `glossary_id`, passing `sourceLanguage`, `sourceText`, `targetLanguage`, and `targetText`. A term found in the source but missing from the target (i.e. `sourceCount > 0` but `targetCount == 0` in the per-term `terms` array) is a glossary compliance violation. Log these alongside Method A/B findings.
 
 **Review every finding before dismissing or accepting it** — the script raises signals, not verdicts. For each one, read the actual source/target context and append one line to `tools/consistency_findings.jsonl`:
 - `confirmed` (status stays `open`) if it's a real inconsistency, or
