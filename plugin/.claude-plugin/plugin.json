@@ -14,6 +14,21 @@
       "title": "Algebras API Key",
       "description": "API key from https://platform.algebras.ai/api-keys",
       "sensitive": true
+    },
+    "algebras_platform_url": {
+      "type": "string",
+      "title": "Algebras Platform URL",
+      "description": "Platform URL (default: https://platform.algebras.ai)",
+      "default": "https://platform.algebras.ai"
+    }
+  },
+  "mcpServers": {
+    "algebras": {
+      "type": "http",
+      "url": "${user_config.algebras_platform_url}/api/mcp",
+      "headers": {
+        "x-api-key": "${user_config.algebras_api_key}"
+      }
     }
   }
 }
