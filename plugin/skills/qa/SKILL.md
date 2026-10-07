@@ -58,6 +58,8 @@ Read `tools/fluency_scores.jsonl` for the rows/languages in scope. Apply the sam
 
 These scores describe step 1's *pre-glossary* translation, not the step-3, glossary-applied text that was actually written in 3.3 — the two can read differently. Treat the log as a diagnostic about the underlying translation quality independent of glossary effects, not a gate on the shipped text: **do not revise a string because of its fluency score, and do not re-score anything here.** A string revised for another reason (a consistency finding, a reviewer-flagged fix) keeps its original score in the log — it does not get a new one.
 
+Regenerate `fluency_report.csv` in the project root from the full `tools/fluency_scores.jsonl` — the translate skill maintains this file incrementally per batch, but regenerating it here ensures it reflects the final state (any rows added during QA-driven re-translations, any corrections). Same columns as defined in the translate skill's 3.2.
+
 ## 4.4 Reviewer agent (multi-agent proofreading)
 
 For large files or full coverage passes, dispatch a read-only reviewer agent per language (or language group). Provide it:

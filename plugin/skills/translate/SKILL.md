@@ -51,6 +51,14 @@ Fluency is measured **once**, on the pre-glossary translation, and never again �
 
 If the API skipped scoring for a given string (it does this for long text), write `"fluency": null` rather than leaving the row out — that tells the `qa` skill's 4.3 the string was genuinely never scored, as opposed to scored-and-good. This log is the **only** source of fluency data from here on — never call `check_fluency`/`check_fluency_batch` again, and never pass `fluency: true` on any translate call, for a string that already has an entry here, even if it gets revised later.
 
+After appending to the JSONL log, also update `fluency_report.csv` in the project root — a user-facing report that can be opened in Google Sheets or Excel. Create it with headers on the first batch; append rows on subsequent batches. Columns:
+
+```
+id,source_lang,target_lang,source_text,fluency_score,idiomatic,collocational,discourse,pragmatic,calque,issue_type,severity,problematic_phrase,suggested_fix,main_issue
+```
+
+For strings the API skipped (`fluency: null`), leave the score columns empty. Quote fields that contain commas or newlines. This CSV is derived from the JSONL log — if the two ever diverge, the JSONL is authoritative.
+
 **Step 3 — final, with glossary.** Call `translate_batch`/`translate_text` (or `translate_batch_async` — see below) again on the same texts, this time **with** `glossaryId` set to `project.json`'s `glossary_id`, and without `fluency` — this call's output is what actually gets written in 3.3. Step 1's translation is discarded; only step 3's is kept.
 
 For steps 1 and 3: chunk to ≤20 texts per call (the API's hard cap on `translate_batch`/`translate_batch_async`); step 2's `check_fluency_batch` shares the same 20-item cap, so keep the same chunking across all three steps. If the batch you declared in 3.1 is larger, sub-chunk it here without changing what counts as "the batch" for 3.4's consistency check.
