@@ -15,10 +15,13 @@ Works with Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, or any agent th
 Paste this into Claude Code:
 
 ```
-Install the Algebras translation plugin from https://github.com/algebras-ai/algebras-agent and set it up for this project.
+Run these commands to install the Algebras translation plugin, then run the setup skill:
+/plugin marketplace add algebras-ai/algebras-agent
+/plugin install algebras-agent@algebras-agent
+/algebras-agent:setup
 ```
 
-Claude will add the marketplace, install the plugin, and walk you through setup.
+Claude will run the plugin commands and walk you through setup.
 
 **Option B — Manual steps**
 
