@@ -1,9 +1,27 @@
 {
   "name": "algebras-agent",
   "description": "AI translation workflow — automated QA and fluency scoring via Algebras",
+  "version": "0.0.1",
   "author": {
     "name": "Algebras",
     "email": "support@algebras.ai"
   },
-  "homepage": "https://platform.algebras.ai"
+  "homepage": "https://platform.algebras.ai",
+  "license": "MIT",
+  "context": "($SKILL.md/CLAUDE.md)",
+  "allowed-tools": {
+    "bash": ["python"],
+    "read": true,
+    "write": ["project.json", "project/**"],
+    "webfetch": ["https://platform.algebras.ai", "https://docs.algebras.ai"],
+    "import": true
+  },
+  "user_config": [
+    {
+      "id": "algebras_api_key",
+      "label": "Algebras API Key",
+      "description": "API key from https://platform.algebras.ai/api-keys",
+      "sensitive": true
+    }
+  ]
 }
