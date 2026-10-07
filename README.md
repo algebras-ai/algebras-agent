@@ -10,22 +10,33 @@ Works with Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, or any agent th
 
 ### Claude Code
 
-Run these two commands inside Claude Code (no cloning required):
+**Option A — One-liner prompt**
+
+Paste this into Claude Code:
+
+```
+Install the Algebras translation plugin from https://github.com/algebras-ai/algebras-agent and set it up for this project.
+```
+
+Claude will add the marketplace, install the plugin, and walk you through setup.
+
+**Option B — Manual steps**
 
 ```
 /plugin marketplace add algebras-ai/algebras-agent
 /plugin install algebras-agent@algebras-agent
 ```
 
-Then run the setup skill. It opens your browser for the API key, copies the workflow files into your project, and registers the MCP server automatically:
+Then run the setup skill — it opens your browser for the API key, copies workflow files into your project, and saves the key to `.env`:
 
 ```
 /algebras-agent:setup
 ```
 
-Reload plugins when prompted:
+The MCP server connects automatically once the plugin has your API key (declared in `plugin.json`). If you need to reconfigure the key later:
 
 ```
+/plugin configure algebras-agent@algebras-agent
 /reload-plugins
 ```
 
