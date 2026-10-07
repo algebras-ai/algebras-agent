@@ -10,27 +10,20 @@ Works with Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, or any agent th
 
 ### Claude Code
 
-**Option A — One-liner prompt**
+> **Note:** Plugin commands require the Claude Code CLI (`claude` in your terminal). They are not available in the Claude Code web app or desktop app.
 
-Paste this into Claude Code:
+Run these commands in the Claude Code CLI from your project directory:
 
-```
-Run these commands to install the Algebras translation plugin, then run the setup skill:
-/plugin marketplace add algebras-ai/algebras-agent
-/plugin install algebras-agent@algebras-agent
-/algebras-agent:setup
+```bash
+claude plugin marketplace add algebras-ai/algebras-agent
+claude plugin install algebras-agent@algebras-agent
 ```
 
-Claude will run the plugin commands and walk you through setup.
-
-**Option B — Manual steps**
+Then start an interactive session and run the setup skill — it opens your browser for the API key, copies workflow files into your project, and saves the key to `.env`:
 
 ```
-/plugin marketplace add algebras-ai/algebras-agent
-/plugin install algebras-agent@algebras-agent
+claude
 ```
-
-Then run the setup skill — it opens your browser for the API key, copies workflow files into your project, and saves the key to `.env`:
 
 ```
 /algebras-agent:setup
