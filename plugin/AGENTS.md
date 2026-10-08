@@ -35,6 +35,13 @@ Start at `onboard` for a new project. If `project.json` already exists and is co
 - Never rebuild the glossary from scratch unless the user explicitly asks — update or delete individual terms instead.
 - Optional deduplication across all glossary terms is available once a glossary exists — always ask the user first, never run automatically. See the `translate` skill's pre-batch step, or invoke the `glossary-dedupe` skill (`algebras-agent:glossary-dedupe`) directly at any time.
 
+### Context
+
+- Never guess a context fact. A fact is resolved only from a cited source: a client file, a column in the source table, or an explicit user answer. An inference stays a `candidate` until the user confirms it.
+- Missing context never blocks the pipeline. Unresolved facts stay `open`, go to the client question list, and translation uses wording that does not commit to the unknown fact.
+- Ask little at the start. The intake step shows one coverage table and at most 5 questions, ranked by how many strings each answer unblocks. Everything else goes to the client question list.
+- What to collect is specified in `CONTEXT_REQUIREMENTS.md`.
+
 ### Tool generation
 
 - Check `tools/` for an existing tool before generating a new one.

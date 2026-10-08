@@ -14,6 +14,8 @@ Run this phase at the start of every new session, or whenever `project.json` is 
 
 List all files in the working directory recursively. Identify candidate translation files by reading their contents — look for bilingual tables, string IDs, subtitle cue blocks, key-value pairs, or any structure that pairs source text with target language slots. Do not filter by extension.
 
+After the translation files are identified, classify every other file in the folder against the eight sections of `CONTEXT_REQUIREMENTS.md` (Glossary, History & decisions, Universe, Tone of voice, Social graph, UX screenshots, Integrations, Files). Read each file's contents and classify by content, not by file name. Do not modify client context files. Settled decisions in History & decisions are sources for resolved facts; open questions already written there go to the client question list and are not asked again.
+
 ### 1.2 Understand the domain
 
 Read a representative sample of source strings (at minimum 30–50 rows or the full file if small). Determine:
@@ -25,6 +27,22 @@ Read a representative sample of source strings (at minimum 30–50 rows or the f
 - **Notable constraints**: timing sensitivity (VO/subtitles), placeholder syntax, profanity level, character limits
 
 If anything is ambiguous, ask the user before proceeding.
+
+### 1.2b Context intake
+
+This step never blocks the pipeline. Show one coverage table and at most 5 questions, then continue whether or not the user answers.
+
+Read `CONTEXT_REQUIREMENTS.md` and compare the files classified in 1.1 with the facts each target language forces.
+
+Build a coverage table: section, status (`present` / `partial` / `missing` / `not needed for this content type`), source file, and the number of strings that depend on it.
+
+For each target language, decide which language-forced facts each string needs (speaker gender, addressee gender, addressee number, formality, pronoun referent, placeholder meaning). Re-check the guidance table in `CONTEXT_REQUIREMENTS.md` for the actual target languages. A fact is resolved only from a cited source: a client file, a column in the source table, or an explicit user answer. An inference stays a `candidate` until the user confirms it. Anything else stays `open`. Do not guess.
+
+Generate a reusable tool, `tools/context_facts.py`, if one does not already exist. Build it on the Phase 1 parser (generate that parser first, under the same rules as 1.4, if it does not exist yet). The tool is generic: no hardcoded column names, language codes, or row ranges. It writes `context_facts.jsonl` in the project root, one line per string per language, with each required fact as `resolved` (value + source), `candidate` (value + reason), or `open`.
+
+Group open facts into questions about facts, not about sections. Rank them by how many strings an answer would unblock. Show the coverage table and at most 5 questions. Write every question, including the ones you did not show, to `client_questions.md` in the project root: deduplicated, each with the fact type, the affected languages, the number of strings it unblocks, and 2 example rows. This file is for the project manager to forward to the client.
+
+Screenshots: link a column, else a file named by string key or row, else skip. If none are linked and the content type needs them (UI, games), one of the 5 questions asks once whether the client has screenshots or a playable build. If they have a playable build and want automated capture, write a runner spec into `tools/` (Playwright, PyAutoGUI, or Appium) and do not run it without explicit permission. Otherwise record coverage, including 0% when nothing is linked, and move on.
 
 ### 1.3 Generate project.json
 
@@ -45,11 +63,17 @@ Write `project.json` based on what you've discovered. Do not copy a template —
   "non_latin_langs": [],
   "glossary_id": null,
   "mcp_url": "https://platform.algebras.ai/api/mcp",
-  "notes": "<any other project-specific context worth remembering>"
+  "notes": "<any other project-specific context worth remembering>",
+  "context_files": { "<section>": ["<relative path>", "..."] },
+  "context_coverage": { "<section>": "present|partial|missing|not_needed" },
+  "screenshot_coverage": 0.0,
+  "client_questions_file": "client_questions.md"
 }
 ```
 
 `glossary_id` stays `null` here — Phase 2 creates the glossary on the Algebras platform and fills this in. There is no local glossary directory or file.
+
+Fill the four context fields from 1.2b. Keep every other field. Section keys are `glossary`, `history`, `universe`, `tone_of_voice`, `social_graph`, `screenshots`, `integrations`, `files`. Use `[]` when a section has no file. Store `not_needed` for "not needed for this content type". `screenshot_coverage` is a fraction from 0.0 to 1.0.
 
 If you can't determine a field with confidence, prompt the user:
 
@@ -76,6 +100,8 @@ Before any translation work, output a summary and wait for user confirmation:
 > - Targets: [list of target languages]
 > - Glossary: [N active terms / empty / missing]
 > - Tools available: [list of scripts in tools/]
+> - Context: [one line per present or partial section — section, status, source file. If none: "no client context files found"]
+> - Open facts: [count of open facts per target language, and the single top question]
 >
 > Does this look right? If anything is wrong, tell me now before I proceed.
 
@@ -90,6 +116,8 @@ Glossaries are not local files. They live on the Algebras platform, managed thro
 ### 2.1 Check glossary state
 
 If `project.json`'s `glossary_id` is already set, call `get_glossary` with it and use that as the current state. If it's `null`: call `list_glossaries` first to avoid creating a duplicate for a project that already has one, otherwise call `create_glossary` with a name derived from the project and `languages` set to `source_lang` plus every `target_langs` entry. Write the returned `id` into `project.json`'s `glossary_id` right away.
+
+Before extracting new candidates, if `project.json` lists a glossary file under `context_files.glossary`, propose importing its terms into the platform glossary. Present them in the same confirmation table as 2.4, and create accepted rows through the 2.5 bulk create flow. Do not import silently. Record grammatical gender inside the definition text.
 
 ### 2.2 Extract candidate terms
 
@@ -135,9 +163,10 @@ Each accepted row becomes one glossary term with one `definitions[]` entry per l
 ### 3.1 State rules before each batch
 
 Before translating any batch, declare:
-- Target locale, register, and formality level
+- Target locale, register, and formality level. If formality is an open fact for this batch, declare it as open instead of choosing a level.
 - Glossary terms that apply to this batch
 - Domain-specific constraints (timing sensitivity, placeholder syntax, profanity intensity, character limits)
+- Resolved facts for this batch, each with its source, and the open facts that still apply, from `context_facts.jsonl`
 
 ### 3.2 Translate — three steps per batch
 
@@ -154,7 +183,9 @@ Chunk steps 1 and 3 to ≤20 texts per call (the API's hard cap); step 2's `chec
 - `translate_text`/`check_fluency` — single strings only. A revision of an already-scored string skips straight to step 3; it doesn't get a second score.
 - **Agentic pipeline** (`POST /translation/agentic-translate`, then poll `GET /translation/agentic-translate/{id}` via `curl -H "X-Api-Key: $ALGEBRAS_API_KEY" "$ALGEBRAS_PLATFORM_URL/api/v1/translation/agentic-translate..."`) — the one direct-HTTP case, since no MCP tool wraps it. Reserve for the step-3 call on high-value strings; it costs **4x** a normal call. Steps 1-2's score still come from ordinary calls as above — don't call `check_fluency` on the agentic result afterward.
 
-Pass `contexts` (per-text, aligned by index) on both translate steps whenever row-level context would help.
+Pass `contexts` (per-text, aligned by index) on both translate steps whenever row-level context would help. Include resolved facts from `context_facts.jsonl` (speaker, addressee, formality, referent). Never send a `candidate` fact as resolved. For strings with open or candidate facts, add a `prompt` instruction to choose wording that does not commit to the unknown fact (for example a gender-neutral construction).
+
+If the user answers a client question mid-run, update `context_facts.jsonl` and `client_questions.md`, then continue. Do not retranslate already written strings automatically; list them as affected and ask.
 
 **Apply glossary terms exactly (step 3).** For source terms not yet in the glossary:
 1. Search the web for established translations before coining your own.
@@ -231,6 +262,7 @@ After each batch:
 - Fluency scores from `tools/fluency_scores.jsonl` (min, mean, any below 6, any `null`/unscored) — labeled as the pre-glossary baseline, not a score of the shipped text
 - Edits applied
 - Remaining issues for user review
+- Context: coverage per section from `project.json`'s `context_coverage`, screenshot coverage, open facts per language, and the top client questions ranked by strings unblocked, with a pointer to `client_questions.md`
 
 ---
 
@@ -247,6 +279,13 @@ After each batch:
 - Glossaries live on the Algebras platform, not as local files. Create, read, update, and delete terms through the `algebras` MCP server's glossary tools (`create_glossary_term`, `list_glossary_terms`, `update_glossary_term`, `delete_glossary_term`, etc.), and keep the working glossary's id in `project.json`'s `glossary_id`.
 - Add valid inflected forms as their own term definitions when QA flags a correct translation.
 - Never rebuild the glossary from scratch unless the user explicitly asks — update or delete individual terms instead.
+
+### Context
+
+- Never guess a context fact. A fact is resolved only from a cited source: a client file, a column in the source table, or an explicit user answer. An inference stays a `candidate` until the user confirms it.
+- Missing context never blocks the pipeline. Unresolved facts stay `open`, go to the client question list, and translation uses wording that does not commit to the unknown fact.
+- Ask little at the start. The intake step shows one coverage table and at most 5 questions, ranked by how many strings each answer unblocks. Everything else goes to the client question list.
+- What to collect is specified in `CONTEXT_REQUIREMENTS.md`.
 
 ### Tool generation
 

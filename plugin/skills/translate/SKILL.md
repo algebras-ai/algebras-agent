@@ -33,9 +33,10 @@ Skip this step entirely for projects at or under the 2,000-segment threshold —
 ## 3.1 State rules before each batch
 
 Before translating any batch, declare:
-- Target locale, register, and formality level
+- Target locale, register, and formality level. If formality is an open fact for this batch, declare it as open instead of choosing a level.
 - Glossary terms that apply to this batch
 - Domain-specific constraints (timing sensitivity, placeholder syntax, profanity intensity, character limits)
+- Resolved facts for this batch, each with its source, and the open facts that still apply, from `context_facts.jsonl`
 
 ## 3.2 Translate — three steps per batch
 
@@ -68,7 +69,9 @@ Pick the tool per step, independently:
 - `translate_text`/`check_fluency` — only for a single string (a one-off re-translation after a fix, or a chunk of exactly one). If it's a fresh string with no `tools/fluency_scores.jsonl` entry yet, it still needs its own step-1/step-2/step-3 sequence; if it's a revision of an already-scored string, skip straight to step 3 — it already has a score, and it doesn't get another one.
 - **Agentic pipeline** (`POST /translation/agentic-translate`, then poll `GET /translation/agentic-translate/{id}` with `curl -H "X-Api-Key: $ALGEBRAS_API_KEY" "$ALGEBRAS_PLATFORM_URL/api/v1/translation/agentic-translate..."`) — the one case that's direct HTTP rather than MCP, because no MCP tool wraps it yet. Reserve it for the step-3 (glossary) call on strings where the extra "human-like" quality is worth **4x the credit cost** — hero/marketing copy. Steps 1-2 (the fluency baseline) still come from ordinary `translate_batch`/`check_fluency_batch` calls as above; don't call `check_fluency` again afterward to score the agentic result — per the no-second-measurement rule, once a string has a step-2 score, that's its only score.
 
-Pass `contexts` (per-text, aligned by index) on both translate steps whenever you have row-level context (`Comment`, `Speaker`, `Addressee`, etc.) that would help the translation — the API doesn't see your project's columns unless you hand it over.
+Pass `contexts` (per-text, aligned by index) on both translate steps whenever you have row-level context (`Comment`, `Speaker`, `Addressee`, etc.) that would help the translation — the API doesn't see your project's columns unless you hand it over. Include resolved facts from `context_facts.jsonl` for that string and language: speaker, addressee, formality, and referent, each with its source. Never send a `candidate` fact as resolved — omit candidate values from `contexts`. For any string with an open or candidate fact, add a `prompt` instruction to choose wording that does not commit to the unknown fact (for example a gender-neutral construction, or a phrasing that avoids tu/vous until formality is known).
+
+If the user answers a client question mid-run, update the matching lines in `context_facts.jsonl` (`resolved`, source `user`) and update `client_questions.md`, then continue the current batch with those facts. Do not retranslate strings already written. List the affected string ids and ask whether to retranslate them.
 
 **Apply glossary terms exactly (step 3).** For source terms not yet in the glossary:
 1. Search the web for established translations before coining your own.

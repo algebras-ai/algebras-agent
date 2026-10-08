@@ -107,6 +107,11 @@ The agent onboards your project, builds a glossary, translates, and runs QA auto
 | `.windsurfrules` | Workflow for Windsurf |
 | `.github/copilot-instructions.md` | Workflow for GitHub Copilot |
 | `COMMON_MISTAKES.md` | Error taxonomy from real-world LQA |
+| `CONTEXT_REQUIREMENTS.md` | Client context the agent expects, and which facts each target language forces |
+
+## Prepare your project folder
+
+Put any brief, style guide, character list, glossary, or screenshots in the project folder next to the translation files. Any file name is fine — the agent classifies files by their contents. What to include, and which facts each target language forces, is specified in [CONTEXT_REQUIREMENTS.md](plugin/CONTEXT_REQUIREMENTS.md). Missing context does not block translation. The agent asks a few questions and records the rest for the client.
 
 ## GitHub Actions (CI/CD)
 
