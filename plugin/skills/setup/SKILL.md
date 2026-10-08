@@ -17,12 +17,12 @@ Copy the workflow instruction files from the plugin cache into the project root.
 Resolve `PLUGIN_ROOT` this way:
 - In Claude Code, use `${CLAUDE_PLUGIN_ROOT}` when it is set.
 - In Codex, use the installed plugin root that contains this `skills/setup/SKILL.md` file.
-- If neither can be resolved, search upward from this skill file until you find `CLAUDE.md`, `AGENTS.md`, and `COMMON_MISTAKES.md` together.
+- If neither can be resolved, search upward from this skill file until you find `CLAUDE.md`, `AGENTS.md`, `COMMON_MISTAKES.md`, and `CONTEXT_REQUIREMENTS.md` together.
 
 Then copy from `PLUGIN_ROOT`:
 
 ```bash
-for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md; do
+for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md CONTEXT_REQUIREMENTS.md; do
   cp -n "${PLUGIN_ROOT}/$f" "$PROJECT_ROOT/$f" 2>/dev/null || true
 done
 ```

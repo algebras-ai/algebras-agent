@@ -89,6 +89,7 @@ After each batch:
 - Fluency scores from `tools/fluency_scores.jsonl` (min, mean, any below 6, any `null`/unscored) — labeled as the pre-glossary baseline, not a score of the shipped text
 - Edits applied
 - Remaining issues for user review
+- Context: coverage per section from `project.json`'s `context_coverage`, screenshot coverage, open facts per language from `context_facts.jsonl`, and the top client questions ranked by strings unblocked, with a pointer to `client_questions.md`
 
 ## Next
 

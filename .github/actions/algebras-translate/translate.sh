@@ -31,7 +31,7 @@ fi
 # ── B. Download workflow files ────────────────────────────────────────────────
 
 echo "::group::Downloading workflow files"
-for f in CLAUDE.md AGENTS.md COMMON_MISTAKES.md; do
+for f in CLAUDE.md AGENTS.md COMMON_MISTAKES.md CONTEXT_REQUIREMENTS.md; do
   curl -fsSL "$GITHUB_RAW/$f" -o "$f"
   echo "  Downloaded $f"
 done

@@ -26,6 +26,8 @@ If `glossary_id` is `null`:
 
 Report the result: "Glossary `<name>` (`<id>`) — `<N>` existing terms" (or "0 — empty, ready for bootstrapping").
 
+Before extracting new candidates in 2.2, check `project.json`'s `context_files.glossary`. If it lists one or more client glossary files, read them and propose those terms for import. Present them in the same confirmation table as 2.4, before any candidates extracted from source strings. Do not import silently, and do not call `bulk_create_glossary_terms` until the user accepts the rows. Accepted rows go through the 2.5 bulk create flow. Map each term's type, definition, translation, and grammatical gender onto the existing `definitions[]` shape — when the platform schema has no separate gender field, record grammatical gender inside the definition text. Terms the user skips are not created. Then continue with 2.2 for terms that are still missing.
+
 ## 2.2 Extract candidate terms
 
 Read all source strings in the files to be processed. Identify terms worth pinning to the glossary:
