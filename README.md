@@ -1,6 +1,6 @@
-# Algebras Translation Agent
+# Algebras Localization Agent
 
-AI-powered translation workflow with automated QA and real-time fluency scoring via [Algebras](https://platform.algebras.ai).
+AI-powered localization workflow with automated QA and real-time fluency scoring via [Algebras](https://platform.algebras.ai).
 
 Works with Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, or any agent that supports MCP tools.
 
