@@ -44,6 +44,11 @@ inputs:
     required: false
     default: "true"
 
+  project-type:
+    description: "Project type flow from PROJECT_TYPES.md: 'games', 'edtech', 'saas', or 'general'"
+    required: false
+    default: "general"
+
   min-fluency-score:
     description: "Fail the action if any string scores below this threshold (1–10). Leave empty to disable."
     required: false
@@ -69,4 +74,5 @@ runs:
         INPUT_CREATE_PR: ${{ inputs.create-pr }}
         INPUT_SKIP_IF_COMPLETE: ${{ inputs.skip-if-complete }}
         INPUT_MIN_FLUENCY_SCORE: ${{ inputs.min-fluency-score }}
+        INPUT_PROJECT_TYPE: ${{ inputs.project-type }}
       run: bash "${{ github.action_path }}/translate.sh"

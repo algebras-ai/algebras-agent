@@ -3,7 +3,8 @@ set -euo pipefail
 
 PLATFORM_URL="https://platform.algebras.ai"
 GITHUB_RAW="https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/plugin"
-WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md)
+WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md)
+PHASE_SKILLS=(onboard glossary glossary-dedupe translate qa)
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 
@@ -64,20 +65,42 @@ for file in "${WORKFLOW_FILES[@]}"; do
     echo "  Copied:  $file"
   fi
 done
+for phase in "${PHASE_SKILLS[@]}"; do
+  file="skills/$phase/SKILL.md"
+  if [[ -f "$file" ]]; then
+    echo "  Skipped: $file (already exists)"
+  else
+    mkdir -p "skills/$phase"
+    curl -fsSL "$GITHUB_RAW/$file" -o "$file"
+    echo "  Copied:  $file"
+  fi
+done
 
 # ── API key ───────────────────────────────────────────────────────────────────
 
-api_keys_url="$PLATFORM_URL/api-keys"
-if command -v open >/dev/null 2>&1; then
-  open "$api_keys_url"
-elif command -v xdg-open >/dev/null 2>&1; then
-  xdg-open "$api_keys_url" 2>/dev/null || true
-else
-  printf '\nOpen this URL to get your API key:\n  %s\n' "$api_keys_url" >&2
+# Reuse an existing key: ALGEBRAS_API_KEY from the environment, then from .env.
+api_key="${ALGEBRAS_API_KEY:-}"
+if [[ -z "$api_key" && -f ".env" ]]; then
+  api_key=$(sed -n 's/^ALGEBRAS_API_KEY=//p' .env | tail -n 1 | tr -d '\r' | sed -e 's/^["'"'"']//' -e 's/["'"'"']$//')
 fi
 
-printf '\nPaste your Algebras API key:\n> ' >&2
-IFS= read -r api_key </dev/tty
+if [[ -n "$api_key" ]]; then
+  echo ""
+  echo "Using ALGEBRAS_API_KEY from your environment or .env."
+else
+  api_keys_url="$PLATFORM_URL/api-keys"
+  if command -v open >/dev/null 2>&1; then
+    open "$api_keys_url"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$api_keys_url" 2>/dev/null || true
+  else
+    printf '\nOpen this URL to get your API key:\n  %s\n' "$api_keys_url" >&2
+  fi
+
+  printf '\nPaste your Algebras API key:\n> ' >&2
+  IFS= read -r api_key </dev/tty
+fi
+
 if [[ -z "$api_key" || "$api_key" == *" "* ]]; then
   echo "Invalid key. Exiting." >&2
   exit 1
@@ -210,3 +233,4 @@ printf '  Workflow files  →  project root\n'
 printf '  API key         →  .env\n'
 printf '  MCP server      →  %s\n' "$config_path"
 printf '\nOpen your project in %s and say: "Translate this project."\n' "$agent"
+printf 'Optionally add a project type to pick a flow: "Project type: games|edtech|saas|general".\n'

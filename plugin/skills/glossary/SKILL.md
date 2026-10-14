@@ -37,6 +37,8 @@ Read all source strings in the files to be processed. Identify terms worth pinni
 
 Aim for quality over quantity. Skip terms whose translation is obvious and unambiguous.
 
+Use the project's flow (from `project.json`'s `domain`, see `PROJECT_TYPES.md`) to decide which kinds of terms matter most, and read the files in `project.json`'s `context_files` — lore bibles, product docs and style guides are prime sources of names and terminology. Where the repo already has translations (onboard 1.2c), use their existing renderings as the first candidate for each term.
+
 ## 2.3 Research established translations
 
 For each candidate term, use web search to find whether an official or widely-used translation already exists in each target language:

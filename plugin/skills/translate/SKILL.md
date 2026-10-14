@@ -18,24 +18,28 @@ Before translating the first batch of the session, if the glossary already has c
 
 This is optional and must never run without explicit agreement. If the user agrees, invoke the `glossary-dedupe` skill (`algebras-agent:glossary-dedupe`) if skill invocation is available in this session, otherwise read and follow `skills/glossary-dedupe/SKILL.md` in full — it creates the deduplication tool (if one doesn't exist yet) and runs it. If the user declines, skip straight to 3.0.
 
-## 3.0 Pre-translation checkpoint (large projects)
+## 3.0 Branch and checkpoint
 
-Before writing the first translation of the session, count the total source segments across all files to be translated.
+Before writing the first translation of the session, set up where the work will land so the user can review it like any other change.
 
-If the project has **more than 2,000 source segments**, treat it as large and add a version-control safety net:
+**Skip this step when running non-interactively in CI** (e.g. the Algebras GitHub Action) — the action manages branches and commits itself.
 
-1. Check whether `PROJECT_ROOT` is already a git repository (`git rev-parse --is-inside-work-tree`).
-2. If it isn't, propose running `git init` to the user — do not run it silently. Explain why: a baseline makes any future mid-batch tooling issue or bad edit trivially recoverable via `git diff` / `git checkout`.
-3. Once a repo exists (new or pre-existing), propose committing the current pre-translation state as a baseline checkpoint (e.g. `git commit -m "pre-translation baseline"`). Always confirm with the user first — if the repo already has uncommitted changes, do not fold them into your baseline commit or commit over someone else's in-progress work; ask how they want to handle it first.
+1. Check whether `PROJECT_ROOT` is a git repository (`git rev-parse --is-inside-work-tree`).
+2. **Git repository:** if the current branch isn't already an `algebras/localize-*` branch from an earlier session, propose creating `algebras/localize-<YYYYMMDD>` from the current branch (`git checkout -b ...`) and confirm with the user first. If the working tree has uncommitted changes, don't fold them into your work or commit over someone else's in-progress work — ask how they want to handle them first (commit or stash them themselves, carry them onto the branch, or work on the current branch instead). If the user prefers to stay on the current branch, do that.
+3. **Not a git repository:** count the total source segments across all files to be translated. If there are **more than 2,000**, propose running `git init` — do not run it silently. Explain why: a baseline makes any future mid-batch tooling issue or bad edit trivially recoverable via `git diff` / `git checkout`. For smaller projects, skip git entirely — a small file doesn't need git ceremony.
+4. **Large projects (more than 2,000 source segments):** once a repo exists (new or pre-existing), propose committing the current pre-translation state as a baseline checkpoint (e.g. `git commit -m "pre-translation baseline"`), with the same confirmation and uncommitted-changes rules as step 2.
 
-Skip this step entirely for projects at or under the 2,000-segment threshold — a small file doesn't need git ceremony.
+The `qa` skill's 4.6 commits the result on this branch at the end.
 
 ## 3.1 State rules before each batch
 
 Before translating any batch, declare:
 - Target locale, register, and formality level
 - Glossary terms that apply to this batch
-- Domain-specific constraints (timing sensitivity, placeholder syntax, profanity intensity, character limits)
+- Domain-specific constraints (timing sensitivity, placeholder syntax, profanity intensity, character limits), including the translation rules of the project's flow (`project.json`'s `domain` → `PROJECT_TYPES.md`)
+- Which `context_files` (from `project.json`) are relevant to this batch — read them before translating it
+
+Only send segments that don't have a translation yet. Segments that are already translated in the repo (onboard 1.2c) are kept as-is and used as reference — don't retranslate or overwrite them unless the user explicitly asks.
 
 ## 3.2 Translate — three steps per batch
 

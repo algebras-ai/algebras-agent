@@ -18,6 +18,14 @@ The agent is format-agnostic. Do not assume any particular file extension, colum
 
 Start at `onboard` for a new project. If `project.json` already exists and is complete, `onboard` will tell you to skip ahead.
 
+## Project types
+
+The user may declare a project type — `Project type: games|edtech|saas|general`, or "Use the `<type>` flow". Each type is a flow defined in `PROJECT_TYPES.md`: what to scan first, which context files to look for, what the glossary and QA should emphasize. The pipeline stays the same. `onboard` (1.0) reads the declared type (default `general`) and records it as `project.json`'s `domain`; later phases read the flow back from `domain`.
+
+## Delivery
+
+In a git repository, the work lands on its own branch (`algebras/localize-<YYYYMMDD>`, created in `translate` 3.0 with the user's confirmation) and is committed at the end of `qa` (4.6), so the user can review it like any other change. Never push or open a pull request unless the user asks.
+
 ---
 
 ## Standing Rules
@@ -61,3 +69,7 @@ Start at `onboard` for a new project. If `project.json` already exists and is co
 | Lore | Preserve mood, register, and title attribution |
 | VO | Preserve speaker intent, addressee, intensity, and timing |
 | Item name | Preserve object type, quantity, and functional meaning |
+| Lesson | Keep explanations unambiguous and at the stated reading level |
+| Quiz item | Preserve the question's meaning, answer-option order, and which option is correct |
+| Email | Keep subject lines short; preserve placeholders, links, and the product's address form |
+| Help article | UI labels referenced in the text must match the translated UI exactly |

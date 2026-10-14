@@ -18,6 +18,8 @@ After each translation batch, run all available tools in `tools/`. Common checks
 - **Numeric preservation** — all numbers match source
 - **Mixed-language / source leakage** — no untranslated segments
 
+Add the checks listed under "QA emphasis" in the project's flow (`project.json`'s `domain` → `PROJECT_TYPES.md`) — e.g. ICU/placeholder validity for `saas`, answer-key alignment for `edtech`, tag integrity and UI length for `games`.
+
 Glossary terminology and cross-batch consistency are handled separately and more rigorously — see the `translate` skill's 3.4 (mid-batch) and 4.2 below (full-corpus).
 
 If a needed QA tool doesn't exist, generate it and run it. Generate tools generically — no hardcoded row ranges or project-specific logic.
@@ -90,6 +92,14 @@ After each batch:
 - Edits applied
 - Remaining issues for user review
 
+## 4.6 Deliver on the branch
+
+When the user is done with this run (no more batches to translate now), and the work is on a git branch (see the `translate` skill's 3.0; skip this step when running non-interactively in CI — the action commits itself):
+
+1. Show `git status` and propose a commit containing the translated files, `project.json`, and `fluency_report.csv`. Leave `tools/` and the logs under it (`fluency_scores.jsonl`, `consistency_findings.jsonl`, caches) out unless the user wants them committed. Confirm with the user before committing.
+2. Commit with a descriptive message, e.g. `Localize <project name>: <languages> via Algebras`.
+3. Tell the user the branch name and how to review it — `git diff <base branch>...HEAD`, or push the branch and open a pull request. **Never push or open a pull request unless the user asks.**
+
 ## Next
 
-This is the last phase for the current batch/scope. To translate another batch, go back to the `translate` skill (3.1). Otherwise, this pipeline run is complete.
+This is the last phase for the current batch/scope. To translate another batch, go back to the `translate` skill (3.1). Otherwise, finish with 4.6 — this pipeline run is complete.
