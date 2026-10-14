@@ -4,6 +4,51 @@ AI-powered translation workflow with automated QA and real-time fluency scoring 
 
 Works with Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, or any agent that supports MCP tools.
 
+> **AI agents:** asked to localize a project with Algebras? Read **[AGENTS.md](AGENTS.md)** and follow it step by step. In short:
+> 1. Read the API key from `ALGEBRAS_API_KEY` (environment or `.env`).
+> 2. Connect the MCP server `https://platform.algebras.ai/api/mcp` with header `x-api-key: <key>`.
+> 3. Use the `Project type:` flow from [`plugin/PROJECT_TYPES.md`](plugin/PROJECT_TYPES.md) (`games`, `edtech`, `saas`, or `general`).
+> 4. Run the workflow in [`plugin/CLAUDE.md`](plugin/CLAUDE.md): onboard → glossary → translate → qa.
+
+---
+
+## Quick start
+
+1. Open **[platform.algebras.ai/translation/agent](https://platform.algebras.ai/translation/agent)**, create an API key, and save it as `ALGEBRAS_API_KEY` in your project's environment or `.env`.
+2. Open your repo in Claude Code, Codex, Cursor, Windsurf, Copilot, or any coding agent, and paste the prompt from that page:
+
+   ```
+   Localize this project with Algebras.
+   Follow the instructions in https://github.com/algebras-ai/algebras-agent
+   Use the API key from ALGEBRAS_API_KEY.
+   Project type: <games|edtech|saas|general>
+   Use the <type> flow from the agent instructions.
+   ```
+
+3. The agent connects to Algebras, builds your localization context, translates, runs QA, and leaves the result on a new git branch (`algebras/localize-<date>`) for you to review like any other change.
+
+To install the agent permanently in your tool instead (plugin or MCP config), see [Install](#install).
+
+### Project types
+
+| Type | Use it for | The flow emphasizes |
+|---|---|---|
+| `games` | Games | UI, quests, item names, lore |
+| `edtech` | Education products | Lessons, quizzes, course pages |
+| `saas` | Software products | App UI, emails, help center |
+| `general` | Any other project | Detected from your files |
+
+Each flow is defined in [`plugin/PROJECT_TYPES.md`](plugin/PROJECT_TYPES.md).
+
+### What the agent builds from your repo
+
+| | |
+|---|---|
+| **Glossary** | Extracted from your code and UI strings, checked against established translations, and confirmed by you. Stored on the Algebras platform. |
+| **Translation memory** | Translations already in your repo are kept and reused as the reference for terminology and style. They aren't translated again. |
+| **Context files** | Specs, docs, lore and style guides found in your repo are read before glossary extraction and each translation batch. |
+| **Screenshots** | Screenshots already in your repo are used as context. Automatic capture is coming soon. |
+
 ---
 
 ## Install
@@ -87,13 +132,15 @@ curl -fsSL https://platform.algebras.ai/install | bash -s -- --agent codex
 
 ## Translate
 
-Open your project in your agent and send:
+Once installed, open your project in your agent and send:
 
 ```
 Translate this project.
 ```
 
-The agent onboards your project, builds a glossary, translates, and runs QA automatically.
+Add a project type to pick a flow, e.g. `Translate this project. Project type: saas`. Or paste the full prompt from the [Quick start](#quick-start) — it works with or without the install step.
+
+The agent onboards your project, builds a glossary, translates, and runs QA, asking you to confirm at each step. In a git repository it works on its own branch and commits the result at the end.
 
 ---
 
@@ -106,7 +153,11 @@ The agent onboards your project, builds a glossary, translates, and runs QA auto
 | `.cursorrules` | Workflow for Cursor |
 | `.windsurfrules` | Workflow for Windsurf |
 | `.github/copilot-instructions.md` | Workflow for GitHub Copilot |
+| `PROJECT_TYPES.md` | The `games`, `edtech`, `saas` and `general` flows |
 | `COMMON_MISTAKES.md` | Error taxonomy from real-world LQA |
+| `skills/<phase>/SKILL.md` | The phases: `onboard`, `glossary`, `translate`, `qa`, plus optional `glossary-dedupe` |
+
+[`AGENTS.md`](AGENTS.md) at the repository root is the entry point for agents that follow this repo's URL without installing anything.
 
 ## GitHub Actions (CI/CD)
 
@@ -147,6 +198,7 @@ On each run the action:
 | `commit-changes` | `true` | Commit translated files |
 | `create-pr` | `false` | Open a PR instead of pushing directly |
 | `skip-if-complete` | `true` | Exit early if nothing needs translating |
+| `project-type` | `general` | Flow from `PROJECT_TYPES.md`: `games`, `edtech`, `saas`, or `general` |
 | `min-fluency-score` | _(empty)_ | Fail if any string scores below this (1–10) |
 
 ### Example

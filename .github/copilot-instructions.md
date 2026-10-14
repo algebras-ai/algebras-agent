@@ -4,27 +4,47 @@ This agent helps human translators produce the best possible machine translation
 
 The agent is format-agnostic. Do not assume any particular file extension, column structure, or glossary format. Generate tools and config on demand as you learn the project.
 
+## Project types
+
+The user may declare a project type — `Project type: games|edtech|saas|general`, or "Use the `<type>` flow". Each type is a flow defined in `PROJECT_TYPES.md` (in the project root if present, otherwise https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/plugin/PROJECT_TYPES.md): what to scan first, which context files to look for, what the glossary and QA should emphasize. The phases stay the same. Phase 1 (1.0) reads the declared type (default `general`) and records it as `project.json`'s `domain`; later phases read the flow back from `domain`.
+
+## Delivery
+
+In a git repository, the work lands on its own branch (`algebras/localize-<YYYYMMDD>`, created in 3.0 with the user's confirmation) and is committed at the end of Phase 4 (4.5), so the user can review it like any other change. Never push or open a pull request unless the user asks.
+
 ---
 
 ## Phase 1 — Project Onboarding
 
 Run this phase at the start of every new session, or whenever `project.json` is missing or incomplete.
 
+### 1.0 Project type
+
+Check whether the user declared a project type (`games`, `edtech`, `saas`, `general`); if not, use `general` (don't ask). Read `PROJECT_TYPES.md` (https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/plugin/PROJECT_TYPES.md if it isn't in the project root) and use that type's flow. It seeds `domain` in 1.3 (`games` → `game`, `edtech` → `edtech`, `saas` → `software`; `general` → derive it in 1.2). With a declared type, don't ask about the domain — only flag it in 1.5 if the files clearly contradict it.
+
 ### 1.1 Discover source files
 
-List all files in the working directory recursively. Identify candidate translation files by reading their contents — look for bilingual tables, string IDs, subtitle cue blocks, key-value pairs, or any structure that pairs source text with target language slots. Do not filter by extension.
+List all files in the working directory recursively. Identify candidate translation files by reading their contents — look for bilingual tables, string IDs, subtitle cue blocks, key-value pairs, or any structure that pairs source text with target language slots. Do not filter by extension. Start with the locations the project type's flow lists under "Scan first", but don't stop there.
 
 ### 1.2 Understand the domain
 
 Read a representative sample of source strings (at minimum 30–50 rows or the full file if small). Determine:
 
-- **Content type**: game (VO lines, UI labels, lore, achievements, item names), software UI, legal document, marketing copy, subtitles, website, mixed
+- **Content type**: game (VO lines, UI labels, lore, achievements, item names), educational content (lessons, quizzes, course pages), software UI (app strings, emails, help center), legal document, marketing copy, subtitles, website, mixed
 - **Register and formality**: casual, formal, technical, child-friendly, etc.
 - **Source language** and all **target languages**
 - **File structure**: how source text and translations are organized (columns, rows, nested keys, tagged segments, etc.)
 - **Notable constraints**: timing sensitivity (VO/subtitles), placeholder syntax, profanity level, character limits
 
 If anything is ambiguous, ask the user before proceeding.
+
+### 1.2b Context files
+
+Look for material that explains the content without being translated itself: specs, design documents, product docs, lore bibles, style guides, brand voice guides, and screenshots of the UI already in the repo. Record them in `project.json`'s `context_files`. Don't translate them unless the user asks — they are reference material for Phases 2–3.
+
+### 1.2c Existing translations (translation memory)
+
+For each target language, count the segments that already have a non-empty translation. They are kept as-is, never sent for translation again (unless the user explicitly asks), and serve as the reference for terminology and style in Phases 2–3.
 
 ### 1.3 Generate project.json
 
@@ -33,11 +53,12 @@ Write `project.json` based on what you've discovered. Do not copy a template —
 ```json
 {
   "name": "<project name inferred from content or filename>",
-  "domain": "<game|software|legal|marketing|subtitles|document|other>",
+  "domain": "<game|edtech|software|legal|marketing|subtitles|document|other>",
   "content_type_notes": "<one-sentence description of what is being translated>",
   "source_lang": "<BCP 47 code>",
   "target_langs": ["<code>", "..."],
   "files": ["<relative path>", "..."],
+  "context_files": ["<relative path to a spec, doc, lore file, style guide, or screenshot>", "..."],
   "source_field": "<column name, JSON key, or XPath — whatever locates source text>",
   "target_fields": {
     "<lang_code>": "<column name / key>"
@@ -71,9 +92,12 @@ Name parsers `tools/parse_<format>.<ext>`. **Generate tools on demand, not ahead
 Before any translation work, output a summary and wait for user confirmation:
 
 > **Project summary**
+> - Project type: [games / edtech / saas / general] — [declared / default] [· note any mismatch with what the files contain]
 > - Content: [what is being translated — e.g. "RPG game — UI labels, VO lines, lore, achievements"]
 > - Source: [language] · [field/column] · [file(s)]
 > - Targets: [list of target languages]
+> - Existing translations: [per language: N of M segments already translated — kept, not re-translated]
+> - Context files: [N found — list the most relevant few]
 > - Glossary: [N active terms / empty / missing]
 > - Tools available: [list of scripts in tools/]
 >
@@ -101,6 +125,8 @@ Read all source strings in the files to be processed. Identify terms worth pinni
 - Any word that appears frequently and can be translated multiple ways
 
 Aim for quality over quantity. Skip terms whose translation is obvious and unambiguous.
+
+Use the project's flow to decide which kinds of terms matter most, and read the files in `project.json`'s `context_files` — lore bibles, product docs and style guides are prime sources of names and terminology. Where the repo already has translations (1.2c), use their existing renderings as the first candidate for each term.
 
 ### 2.3 Research established translations
 
@@ -132,12 +158,19 @@ Each accepted row becomes one glossary term with one `definitions[]` entry per l
 
 ## Phase 3 — Translation
 
+### 3.0 Branch
+
+Before writing the first translation of the session (skip when running non-interactively in CI — the action manages git itself): if `PROJECT_ROOT` is a git repository and the current branch isn't already an `algebras/localize-*` branch, propose creating `algebras/localize-<YYYYMMDD>` (`git checkout -b ...`) and confirm with the user first. If the working tree has uncommitted changes, ask how to handle them — never fold them into your work. If the user prefers to stay on the current branch, do that.
+
 ### 3.1 State rules before each batch
 
 Before translating any batch, declare:
 - Target locale, register, and formality level
 - Glossary terms that apply to this batch
-- Domain-specific constraints (timing sensitivity, placeholder syntax, profanity intensity, character limits)
+- Domain-specific constraints (timing sensitivity, placeholder syntax, profanity intensity, character limits), including the translation rules of the project's flow
+- Which `context_files` are relevant to this batch — read them before translating it
+
+Only send segments that don't have a translation yet. Segments already translated in the repo (1.2c) are kept as-is and used as reference — don't retranslate or overwrite them unless the user explicitly asks.
 
 ### 3.2 Translate — three steps per batch
 
@@ -182,6 +215,8 @@ After each translation batch, run all available tools in `tools/`. Common checks
 - **Length expansion** — text length within safe bounds
 - **Numeric preservation** — all numbers match source
 - **Mixed-language / source leakage** — no untranslated segments
+
+Add the checks listed under "QA emphasis" in the project's flow — e.g. ICU/placeholder validity for `saas`, answer-key alignment for `edtech`, tag integrity and UI length for `games`.
 
 If a needed QA tool doesn't exist, generate it and run it. Generate tools generically — no hardcoded row ranges or project-specific logic.
 
@@ -232,6 +267,10 @@ After each batch:
 - Edits applied
 - Remaining issues for user review
 
+### 4.5 Deliver on the branch
+
+When the user is done with this run and the work is on a git branch (3.0; skip in CI): show `git status`, propose a commit with the translated files, `project.json`, and `fluency_report.csv` (leave `tools/` and its logs out unless the user wants them), and commit after the user confirms. Then tell the user the branch name and how to review it (`git diff <base branch>...HEAD`, or push and open a pull request). **Never push or open a pull request unless the user asks.**
+
 ---
 
 ## Standing Rules
@@ -273,3 +312,7 @@ After each batch:
 | Lore | Preserve mood, register, and title attribution |
 | VO | Preserve speaker intent, addressee, intensity, and timing |
 | Item name | Preserve object type, quantity, and functional meaning |
+| Lesson | Keep explanations unambiguous and at the stated reading level |
+| Quiz item | Preserve the question's meaning, answer-option order, and which option is correct |
+| Email | Keep subject lines short; preserve placeholders, links, and the product's address form |
+| Help article | UI labels referenced in the text must match the translated UI exactly |

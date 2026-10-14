@@ -12,6 +12,14 @@ GITHUB_RAW="https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/pl
 : "${INPUT_CREATE_PR:=false}"
 : "${INPUT_SKIP_IF_COMPLETE:=true}"
 : "${INPUT_MIN_FLUENCY_SCORE:=}"
+: "${INPUT_PROJECT_TYPE:=general}"
+
+if [[ ! "$INPUT_PROJECT_TYPE" =~ ^(games|edtech|saas|general)$ ]]; then
+  echo "::error::project-type must be one of games, edtech, saas, general — got: $INPUT_PROJECT_TYPE"
+  exit 1
+fi
+
+AGENT_PROMPT="Translate this project. Project type: $INPUT_PROJECT_TYPE. Use the $INPUT_PROJECT_TYPE flow from PROJECT_TYPES.md."
 
 if [[ "$INPUT_LLM_PROVIDER" == "anthropic" ]]; then
   if [[ -z "${INPUT_ANTHROPIC_API_KEY:-}" ]]; then
@@ -31,7 +39,7 @@ fi
 # ── B. Download workflow files ────────────────────────────────────────────────
 
 echo "::group::Downloading workflow files"
-for f in CLAUDE.md AGENTS.md COMMON_MISTAKES.md; do
+for f in CLAUDE.md AGENTS.md COMMON_MISTAKES.md PROJECT_TYPES.md; do
   curl -fsSL "$GITHUB_RAW/$f" -o "$f"
   echo "  Downloaded $f"
 done
@@ -117,7 +125,7 @@ if [[ "$INPUT_LLM_PROVIDER" == "anthropic" ]]; then
     --dangerously-skip-permissions \
     --mcp-config "$MCP_CONFIG" \
     --system-prompt-file CLAUDE.md \
-    "Translate this project."
+    "$AGENT_PROMPT"
   echo "::endgroup::"
 
 elif [[ "$INPUT_LLM_PROVIDER" == "gemini" ]]; then
@@ -148,7 +156,7 @@ PYEOF
   gemini \
     --yolo \
     --skip-trust \
-    -p "Translate this project."
+    -p "$AGENT_PROMPT"
   echo "::endgroup::"
 fi
 

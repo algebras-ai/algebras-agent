@@ -22,16 +22,16 @@ Resolve `PLUGIN_ROOT` this way:
 Then copy from `PLUGIN_ROOT`:
 
 ```bash
-for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md; do
+for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md; do
   cp -n "${PLUGIN_ROOT}/$f" "$PROJECT_ROOT/$f" 2>/dev/null || true
 done
 ```
 
-Also copy the four phase skills (`onboard`, `glossary`, `translate`, `qa`) into the project. These give Claude Code/Codex sessions in this project a real, project-scoped skill to invoke even without the plugin installed, and give tools with no skill mechanism (Cursor, Windsurf) a plain file to read as a fallback, per the router files' "How to run a phase" section:
+Also copy the phase skills (`onboard`, `glossary`, `translate`, `qa`, plus the optional `glossary-dedupe`) into the project. These give Claude Code/Codex sessions in this project a real, project-scoped skill to invoke even without the plugin installed, and give tools with no skill mechanism (Cursor, Windsurf) a plain file to read as a fallback, per the router files' "How to run a phase" section:
 
 ```bash
 mkdir -p "$PROJECT_ROOT/skills"
-for phase in onboard glossary translate qa; do
+for phase in onboard glossary glossary-dedupe translate qa; do
   mkdir -p "$PROJECT_ROOT/skills/$phase"
   cp -n "${PLUGIN_ROOT}/skills/$phase/SKILL.md" "$PROJECT_ROOT/skills/$phase/SKILL.md" 2>/dev/null || true
 done
@@ -210,7 +210,7 @@ Print:
 Setup complete.
 
   Workflow files  →  copied to <PROJECT_ROOT>
-  Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,translate,qa}
+  Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,glossary-dedupe,translate,qa}
   API key         →  validated and saved to <PROJECT_ROOT>/.env (source: <env / project .env / global cache / device auth / fresh paste>)
   MCP server      →  registered in <Claude or Codex MCP config>
 
@@ -221,5 +221,7 @@ This agent runs a four-phase pipeline: onboard → glossary → translate → qa
 phase's skill by name (e.g. `algebras-agent:onboard`) if your session supports skills,
 otherwise follow skills/<phase>/SKILL.md directly — see CLAUDE.md/AGENTS.md for details.
 
-Then say: "Translate this project."
+Then say: "Translate this project." — optionally with a project type to pick a flow
+from PROJECT_TYPES.md, e.g. "Translate this project. Project type: saas"
+(games, edtech, saas, or general).
 ```

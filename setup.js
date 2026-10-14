@@ -198,7 +198,10 @@ async function askApiKey() {
   });
 }
 
-const key = await askApiKey();
+// Reuse ALGEBRAS_API_KEY from the environment or .env (loaded above) before prompting.
+const existingKey = (process.env.ALGEBRAS_API_KEY ?? "").trim().replace(/^["']|["']$/g, "");
+if (existingKey) console.log("Using ALGEBRAS_API_KEY from your environment or .env.");
+const key = existingKey || await askApiKey();
 if (!key || key.includes(" ")) {
   console.error("Invalid key. Exiting.");
   process.exit(1);
@@ -211,6 +214,7 @@ const agent = detectAgent();
 if (agent) {
   writeMcpConfig(agent, key);
   console.log(`\nSetup complete. Open your project in ${agent} and say: "Translate this project."`);
+  console.log(`Optionally add a project type to pick a flow: "Project type: games|edtech|saas|general".`);
 } else {
   printMcpConfig(key);
 }
