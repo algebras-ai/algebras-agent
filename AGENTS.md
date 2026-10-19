@@ -6,7 +6,7 @@
 Localize this project with Algebras.
 Follow the instructions in https://github.com/algebras-ai/algebras-agent
 Use the API key from ALGEBRAS_API_KEY.
-Project type: <games|edtech|saas|general>
+Project type: <games|edtech|fintech|saas|general>
 Use the <type> flow from the agent instructions.
 ```
 
@@ -115,15 +115,16 @@ The workflow is the file `<RAW>/CLAUDE.md` plus the files it points to. Read the
 | File | What it is |
 |---|---|
 | `<RAW>/CLAUDE.md` | The workflow overview and standing rules. Follow it for the whole run. |
-| `<RAW>/PROJECT_TYPES.md` | The `games`, `edtech`, `saas` and `general` flows. |
-| `<RAW>/skills/onboard/SKILL.md` | Phase 1: discover files, context and existing translations, write `project.json`. |
+| `<RAW>/PROJECT_TYPES.md` | The `games`, `edtech`, `fintech`, `saas` and `general` flows. |
+| `<RAW>/CONTEXT_REQUIREMENTS.md` | Client context sections, the fact model, and which facts each target language forces. |
+| `<RAW>/skills/onboard/SKILL.md` | Phase 1: discover files, context and existing translations, ask the fluency setting, write `project.json`. |
 | `<RAW>/skills/glossary/SKILL.md` | Phase 2: build the glossary on the Algebras platform. |
-| `<RAW>/skills/translate/SKILL.md` | Phase 3: translate in batches through the MCP tools. |
+| `<RAW>/skills/translate/SKILL.md` | Phase 3: ambiguity check, then translate and score fluency in batches through the MCP tools. |
 | `<RAW>/skills/qa/SKILL.md` | Phase 4: QA, fluency report, deliver on the branch. |
 | `<RAW>/skills/glossary-dedupe/SKILL.md` | Optional glossary cleanup. |
 | `<RAW>/COMMON_MISTAKES.md` | Error taxonomy from real-world LQA. |
 
-When a workflow file mentions a local path like `skills/glossary/SKILL.md` or `PROJECT_TYPES.md` that doesn't exist in the project, read `<RAW>/<that path>` instead.
+When a workflow file mentions a local path like `skills/glossary/SKILL.md`, `PROJECT_TYPES.md` or `CONTEXT_REQUIREMENTS.md` that doesn't exist in the project, read `<RAW>/<that path>` instead.
 
 If you're running with the `algebras-agent` plugin installed (Claude Code, Codex), invoke the skills instead (`algebras-agent:onboard`, ...).
 
@@ -135,14 +136,17 @@ Read the `Project type:` line from the prompt and use that flow from `PROJECT_TY
 |---|---|---|
 | `games` | Games | UI, quests, item names, lore |
 | `edtech` | Education products | Lessons, quizzes, course pages |
+| `fintech` | Payments, banking, wallets, insurance | Money states, fees, disclaimers, statements |
 | `saas` | Software products | App UI, emails, help center |
-| `general` | Anything else | Detected from the project |
+| `general` | Anything else | Detected from the project, per file |
 
-If no type is given, use `general`. The type is recorded in `project.json` during onboarding — don't ask the user to choose it again.
+If no type is given, onboarding infers it from the strings and falls back to `general`. The type is recorded in `project.json` during onboarding — don't ask the user to choose it again.
+
+If the prompt has a `Fluency: none|isolated|context|both` line, onboarding uses it; otherwise onboarding asks once which fluency checks to run.
 
 ## Step 5 — Run the workflow
 
-Run the four phases in order, each in full: **Onboard → Glossary → Translate → QA**. Each phase has user-confirmation gates (project summary, glossary approval, branch and commit) — stop and wait for the user at each one; don't skip them to finish faster.
+Run the four phases in order, each in full: **Onboard → Glossary → Translate → QA**. Each phase has user-confirmation gates (project summary and fluency setting, glossary approval, branch and commit) — stop and wait for the user at each one; don't skip them to finish faster.
 
 ## Step 6 — Deliver
 
@@ -156,5 +160,6 @@ Describe these to the user accurately:
 
 - **Glossary** — extracted from code and UI strings, checked against established translations, confirmed by the user, and stored on the Algebras platform.
 - **Translation memory** — translations already in the repo are kept and reused as the reference for terminology and style. They're never sent for translation again.
-- **Context files** — specs, docs, lore and style guides found in the repo, read before glossary extraction and each translation batch.
-- **Screenshots** — screenshots already in the repo are used as context. Automatic screenshot capture isn't available yet.
+- **Context files** — specs, docs, lore and style guides found in the repo, classified by the sections in `CONTEXT_REQUIREMENTS.md` and read before glossary extraction and each translation batch.
+- **Context facts** — who speaks, to whom, formal or informal, what a placeholder means: recorded in `context_pack.json` and `context_facts.jsonl` only from a cited source. Open points go to `client_questions.md`; missing context never blocks translation.
+- **Screenshots** — screenshots already in the repo are linked to strings and used as context. Automatic screenshot capture isn't available yet.

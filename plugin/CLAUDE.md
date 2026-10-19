@@ -4,10 +4,10 @@ This agent helps human translators produce the best possible machine translation
 
 | Phase | Skill | Purpose | Prerequisite |
 |---|---|---|---|
-| 1 | `onboard` | Discover files, understand the domain, generate `project.json` and parsers | None — entry point |
+| 1 | `onboard` | Discover files, pick the flow, take in client context (coverage, facts, client questions), choose the fluency checks, generate `project.json` and parsers | None — entry point |
 | 2 | `glossary` | Extract, research, and confirm project terminology | Complete `project.json` |
-| 3 | `translate` | Translate each batch in three steps — no-glossary translation, separate fluency measurement, then the final glossary-applied translation that gets written — and mid-batch consistency-check it | Complete `project.json` + confirmed glossary |
-| 4 | `qa` | Local QA, full-corpus consistency, reviewer pass, and reporting the fluency baseline `translate` already captured (never re-measured) | At least one batch already translated |
+| 3 | `translate` | Check each batch for ambiguity, translate it with the glossary and resolved facts, measure fluency as the project's setting says (context-free, context-aware, both, or none), and mid-batch consistency-check it | Complete `project.json` + confirmed glossary |
+| 4 | `qa` | Local QA with the flow's checks, full-corpus consistency, reviewer pass, and reporting the fluency scores `translate` already captured (no new calls) plus context coverage | At least one batch already translated |
 
 The agent is format-agnostic. Do not assume any particular file extension, column structure, or glossary format. Generate tools and config on demand as you learn the project.
 
@@ -20,7 +20,11 @@ Start at `onboard` for a new project. If `project.json` already exists and is co
 
 ## Project types
 
-The user may declare a project type — `Project type: games|edtech|saas|general`, or "Use the `<type>` flow". Each type is a flow defined in `PROJECT_TYPES.md`: what to scan first, which context files to look for, what the glossary and QA should emphasize. The pipeline stays the same. `onboard` (1.0) reads the declared type (default `general`) and records it as `project.json`'s `domain`; later phases read the flow back from `domain`.
+The user may declare a project type — `Project type: games|edtech|fintech|saas|general`, or "Use the `<type>` flow". Each type is a flow defined in `PROJECT_TYPES.md`: what to scan first, which context facts to collect and which questions to ask, what the glossary, translation and QA should emphasize. What the context sections hold is in `CONTEXT_REQUIREMENTS.md`. The pipeline stays the same. `onboard` reads the declared type (or infers it) and records it as `project.json`'s `project_type`; later phases read the flow from there.
+
+## Fluency checks
+
+`onboard` asks once which fluency checks to run and records it as `project.json`'s `fluency`: `none`, `isolated` (context-free score of a no-glossary translation), `context` (context-aware score of the written text, with neighbor strings and approved choices), or `both`. A `Fluency: <setting>` line in the prompt answers it up front; non-interactive runs default to `isolated`. `translate` runs only the chosen checks, measures each string at most once per mode, and logs both scores separately; `qa` makes no fluency calls except an optional, confirmed pass over unscored strings. All scores are a self-check of the agent's own translation.
 
 ## Delivery
 
@@ -42,6 +46,14 @@ In a git repository, the work lands on its own branch (`algebras/localize-<YYYYM
 - Add valid inflected forms as their own term definitions when QA flags a correct translation.
 - Never rebuild the glossary from scratch unless the user explicitly asks — update or delete individual terms instead.
 - Optional deduplication across all glossary terms is available once a glossary exists — always ask the user first, never run automatically. See the `translate` skill's pre-batch step, or invoke the `glossary-dedupe` skill (`algebras-agent:glossary-dedupe`) directly at any time.
+
+### Context
+
+- Never guess a context fact. A fact is resolved only from a cited source: a client file, a column in the source table, an official page for the same UI, or an explicit user answer. An inference stays a `candidate` until the user confirms it.
+- Missing context never blocks the pipeline. Unresolved facts stay `open`, go to `client_questions.md`, and translation uses wording that does not commit to the unknown fact.
+- Ask little at the start. The intake step shows one coverage table and at most 5 questions, ranked by how many strings each answer unblocks. Everything else goes to the client question list.
+- Only `resolved` facts and glossary hits are locks — for translation and for context-aware fluency. `agent-choice`, `provisional` and `glossary-candidate` never are.
+- What to collect is specified in `CONTEXT_REQUIREMENTS.md`. Which of that a project needs is the flow in `PROJECT_TYPES.md`: `games`, `edtech`, `fintech`, `saas`, or `general`.
 
 ### Tool generation
 
@@ -72,4 +84,6 @@ In a git repository, the work lands on its own branch (`algebras/localize-<YYYYM
 | Lesson | Keep explanations unambiguous and at the stated reading level |
 | Quiz item | Preserve the question's meaning, answer-option order, and which option is correct |
 | Email | Keep subject lines short; preserve placeholders, links, and the product's address form |
+| Payment status | Use the locked term for that money state |
+| Disclaimer | Preserve legal force; do not soften it |
 | Help article | UI labels referenced in the text must match the translated UI exactly |

@@ -3,7 +3,7 @@ set -euo pipefail
 
 PLATFORM_URL="https://platform.algebras.ai"
 GITHUB_RAW="https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/plugin"
-WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md)
+WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md)
 PHASE_SKILLS=(onboard glossary glossary-dedupe translate qa)
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
@@ -233,4 +233,5 @@ printf '  Workflow files  →  project root\n'
 printf '  API key         →  .env\n'
 printf '  MCP server      →  %s\n' "$config_path"
 printf '\nOpen your project in %s and say: "Translate this project."\n' "$agent"
-printf 'Optionally add a project type to pick a flow: "Project type: games|edtech|saas|general".\n'
+printf 'Optionally add a project type to pick a flow: "Project type: games|edtech|fintech|saas|general".\n'
+printf 'and the fluency checks to run: "Fluency: none|isolated|context|both".\n'
