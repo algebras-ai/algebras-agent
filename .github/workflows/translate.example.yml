@@ -45,8 +45,11 @@ jobs:
           # ── Skip if already complete ────────────────────────────────────────
           skip-if-complete: "true"
 
-          # ── Project type flow: games | edtech | saas | general ─────────────
+          # ── Project type flow: games | edtech | fintech | saas | general ───
           # project-type: "general"
+
+          # ── Fluency checks: none | isolated | context | both ───────────────
+          # fluency: "isolated"
 
           # ── Optional: fail if any string scores below this (1–10) ──────────
           # min-fluency-score: "7"

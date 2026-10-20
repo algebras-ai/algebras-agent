@@ -22,7 +22,7 @@ Resolve `PLUGIN_ROOT` this way:
 Then copy from `PLUGIN_ROOT`:
 
 ```bash
-for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md; do
+for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md; do
   cp -n "${PLUGIN_ROOT}/$f" "$PROJECT_ROOT/$f" 2>/dev/null || true
 done
 ```
@@ -223,5 +223,6 @@ otherwise follow skills/<phase>/SKILL.md directly — see CLAUDE.md/AGENTS.md fo
 
 Then say: "Translate this project." — optionally with a project type to pick a flow
 from PROJECT_TYPES.md, e.g. "Translate this project. Project type: saas"
-(games, edtech, saas, or general).
+(games, edtech, fintech, saas, or general). Onboarding asks which fluency checks to
+run (none, isolated, context, or both); add e.g. "Fluency: context" to answer up front.
 ```

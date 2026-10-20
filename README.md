@@ -7,7 +7,7 @@ Works with Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, or any agent th
 > **AI agents:** asked to localize a project with Algebras? Read **[AGENTS.md](AGENTS.md)** and follow it step by step. In short:
 > 1. Read the API key from `ALGEBRAS_API_KEY` (environment or `.env`).
 > 2. Connect the MCP server `https://platform.algebras.ai/api/mcp` with header `x-api-key: <key>`.
-> 3. Use the `Project type:` flow from [`plugin/PROJECT_TYPES.md`](plugin/PROJECT_TYPES.md) (`games`, `edtech`, `saas`, or `general`).
+> 3. Use the `Project type:` flow from [`plugin/PROJECT_TYPES.md`](plugin/PROJECT_TYPES.md) (`games`, `edtech`, `fintech`, `saas`, or `general`).
 > 4. Run the workflow in [`plugin/CLAUDE.md`](plugin/CLAUDE.md): onboard → glossary → translate → qa.
 
 ---
@@ -21,7 +21,7 @@ Works with Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, or any agent th
    Localize this project with Algebras.
    Follow the instructions in https://github.com/algebras-ai/algebras-agent
    Use the API key from ALGEBRAS_API_KEY.
-   Project type: <games|edtech|saas|general>
+   Project type: <games|edtech|fintech|saas|general>
    Use the <type> flow from the agent instructions.
    ```
 
@@ -35,10 +35,28 @@ To install the agent permanently in your tool instead (plugin or MCP config), se
 |---|---|---|
 | `games` | Games | UI, quests, item names, lore |
 | `edtech` | Education products | Lessons, quizzes, course pages |
+| `fintech` | Payments, banking, wallets, insurance | Money states, fees, disclaimers, statements |
 | `saas` | Software products | App UI, emails, help center |
-| `general` | Any other project | Detected from your files |
+| `general` | Any other project | Detected from your files, per file |
 
 Each flow is defined in [`plugin/PROJECT_TYPES.md`](plugin/PROJECT_TYPES.md).
+
+### Fluency checks
+
+During onboarding the agent asks which fluency checks to run, and records the answer in `project.json` (add e.g. `Fluency: context` to the prompt to answer up front):
+
+| Setting | What is scored | Approx. cost per string of N words |
+|---|---|---|
+| `none` | Nothing | N |
+| `isolated` | A no-glossary translation, scored on its own (context-free) | 2N + 10 |
+| `context` | The written translation, scored with its neighbor strings and approved choices (context-aware) | N + 10 |
+| `both` | Both scores | 2N + 20 |
+
+Scores land in `fluency_report.csv`. They are a self-check of the agent's own translation, not an independent review.
+
+### Prepare your project folder
+
+Put any brief, style guide, character list, glossary, or screenshots in the project folder next to the translation files. Any file name is fine — the agent classifies files by their contents. What to include, and which facts each target language forces, is in [`plugin/CONTEXT_REQUIREMENTS.md`](plugin/CONTEXT_REQUIREMENTS.md). Missing context doesn't block translation: the agent asks at most five questions and writes the rest to `client_questions.md` for you to forward to the client.
 
 ### What the agent builds from your repo
 
@@ -46,8 +64,9 @@ Each flow is defined in [`plugin/PROJECT_TYPES.md`](plugin/PROJECT_TYPES.md).
 |---|---|
 | **Glossary** | Extracted from your code and UI strings, checked against established translations, and confirmed by you. Stored on the Algebras platform. |
 | **Translation memory** | Translations already in your repo are kept and reused as the reference for terminology and style. They aren't translated again. |
-| **Context files** | Specs, docs, lore and style guides found in your repo are read before glossary extraction and each translation batch. |
-| **Screenshots** | Screenshots already in your repo are used as context. Automatic capture is coming soon. |
+| **Context files** | Specs, docs, lore and style guides found in your repo are classified by what they cover and read before glossary extraction and each translation batch. |
+| **Context facts** | Who speaks, to whom, formal or informal, what a placeholder stands for — recorded only from a cited source (`context_pack.json`, `context_facts.jsonl`). Open points go to `client_questions.md`, and the translation avoids committing to them. |
+| **Screenshots** | Screenshots already in your repo are linked to strings by column or file name and used as context. Automatic capture is coming soon. |
 
 ---
 
@@ -153,7 +172,8 @@ The agent onboards your project, builds a glossary, translates, and runs QA, ask
 | `.cursorrules` | Workflow for Cursor |
 | `.windsurfrules` | Workflow for Windsurf |
 | `.github/copilot-instructions.md` | Workflow for GitHub Copilot |
-| `PROJECT_TYPES.md` | The `games`, `edtech`, `saas` and `general` flows |
+| `PROJECT_TYPES.md` | The `games`, `edtech`, `fintech`, `saas` and `general` flows |
+| `CONTEXT_REQUIREMENTS.md` | Client context the agent expects, the fact model, and which facts each target language forces |
 | `COMMON_MISTAKES.md` | Error taxonomy from real-world LQA |
 | `skills/<phase>/SKILL.md` | The phases: `onboard`, `glossary`, `translate`, `qa`, plus optional `glossary-dedupe` |
 
@@ -198,7 +218,8 @@ On each run the action:
 | `commit-changes` | `true` | Commit translated files |
 | `create-pr` | `false` | Open a PR instead of pushing directly |
 | `skip-if-complete` | `true` | Exit early if nothing needs translating |
-| `project-type` | `general` | Flow from `PROJECT_TYPES.md`: `games`, `edtech`, `saas`, or `general` |
+| `project-type` | `general` | Flow from `PROJECT_TYPES.md`: `games`, `edtech`, `fintech`, `saas`, or `general` |
+| `fluency` | `isolated` | Fluency checks: `none`, `isolated` (context-free), `context` (context-aware), or `both` |
 | `min-fluency-score` | _(empty)_ | Fail if any string scores below this (1–10) |
 
 ### Example

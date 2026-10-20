@@ -13,13 +13,19 @@ GITHUB_RAW="https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/pl
 : "${INPUT_SKIP_IF_COMPLETE:=true}"
 : "${INPUT_MIN_FLUENCY_SCORE:=}"
 : "${INPUT_PROJECT_TYPE:=general}"
+: "${INPUT_FLUENCY:=isolated}"
 
-if [[ ! "$INPUT_PROJECT_TYPE" =~ ^(games|edtech|saas|general)$ ]]; then
-  echo "::error::project-type must be one of games, edtech, saas, general — got: $INPUT_PROJECT_TYPE"
+if [[ ! "$INPUT_PROJECT_TYPE" =~ ^(games|edtech|fintech|saas|general)$ ]]; then
+  echo "::error::project-type must be one of games, edtech, fintech, saas, general — got: $INPUT_PROJECT_TYPE"
   exit 1
 fi
 
-AGENT_PROMPT="Translate this project. Project type: $INPUT_PROJECT_TYPE. Use the $INPUT_PROJECT_TYPE flow from PROJECT_TYPES.md."
+if [[ ! "$INPUT_FLUENCY" =~ ^(none|isolated|context|both)$ ]]; then
+  echo "::error::fluency must be one of none, isolated, context, both — got: $INPUT_FLUENCY"
+  exit 1
+fi
+
+AGENT_PROMPT="Translate this project. Project type: $INPUT_PROJECT_TYPE. Use the $INPUT_PROJECT_TYPE flow from PROJECT_TYPES.md. Fluency: $INPUT_FLUENCY."
 
 if [[ "$INPUT_LLM_PROVIDER" == "anthropic" ]]; then
   if [[ -z "${INPUT_ANTHROPIC_API_KEY:-}" ]]; then
@@ -39,7 +45,7 @@ fi
 # ── B. Download workflow files ────────────────────────────────────────────────
 
 echo "::group::Downloading workflow files"
-for f in CLAUDE.md AGENTS.md COMMON_MISTAKES.md PROJECT_TYPES.md; do
+for f in CLAUDE.md AGENTS.md COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md; do
   curl -fsSL "$GITHUB_RAW/$f" -o "$f"
   echo "  Downloaded $f"
 done

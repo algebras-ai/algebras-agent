@@ -214,7 +214,8 @@ const agent = detectAgent();
 if (agent) {
   writeMcpConfig(agent, key);
   console.log(`\nSetup complete. Open your project in ${agent} and say: "Translate this project."`);
-  console.log(`Optionally add a project type to pick a flow: "Project type: games|edtech|saas|general".`);
+  console.log(`Optionally add a project type to pick a flow: "Project type: games|edtech|fintech|saas|general",`);
+  console.log(`and the fluency checks to run: "Fluency: none|isolated|context|both".`);
 } else {
   printMcpConfig(key);
 }

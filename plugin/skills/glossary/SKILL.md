@@ -26,6 +26,16 @@ If `glossary_id` is `null`:
 
 Report the result: "Glossary `<name>` (`<id>`) — `<N>` existing terms" (or "0 — empty, ready for bootstrapping").
 
+## 2.1b Import the client's glossary
+
+Before extracting new candidates, check `project.json`'s `context_files.glossary`. If it lists client glossary files, read them and propose their terms for import — in the same confirmation table as 2.4, before any candidates extracted from source strings. Never import silently, and don't call `bulk_create_glossary_terms` until the user accepts the rows; accepted rows go through 2.5, skipped rows are not created. Skip terms the platform glossary already has.
+
+Map each client term's type, definition, translation and grammatical gender onto the `definitions[]` shape. The platform has no separate gender or variant field, so:
+- Record grammatical gender inside the definition text (e.g. "Rare magical artifact; de: masculine").
+- Client glossaries often mark inflection and variants: `stem|ending` (no spaces around `|`) is an inflection stem — store the full form as the term; `variant | variant` (spaces around `|`) or a second target column is a second approved form — store the first as the term and note "also approved: <second>" in the definition; `*` is a prefix wildcard — store the base form. Keep these notes, because the local term matching in translate (step 4) reads them.
+
+Then continue with 2.2 for terms that are still missing.
+
 ## 2.2 Extract candidate terms
 
 Read all source strings in the files to be processed. Identify terms worth pinning to the glossary:
@@ -37,14 +47,14 @@ Read all source strings in the files to be processed. Identify terms worth pinni
 
 Aim for quality over quantity. Skip terms whose translation is obvious and unambiguous.
 
-Use the project's flow (from `project.json`'s `domain`, see `PROJECT_TYPES.md`) to decide which kinds of terms matter most, and read the files in `project.json`'s `context_files` — lore bibles, product docs and style guides are prime sources of names and terminology. Where the repo already has translations (onboard 1.2c), use their existing renderings as the first candidate for each term.
+Use the project's flow (`project.json`'s `project_type`, or the file's entry in `file_flows`; see "Glossary emphasis" in `PROJECT_TYPES.md`) to decide which kinds of terms matter most — e.g. games: identical rendering across UI, quests and dialogue; edtech: one subject term across every lesson, code/formulas/units untranslated; fintech: one term per money state and fee, where a near-synonym of a locked status is the wrong term; saas: feature names and UI actions, so help text can match the button — and read the files in `project.json`'s `context_files` — lore bibles, product docs and style guides are prime sources of names and terminology. Where the repo already has translations (onboard 1.2c), use their existing renderings as the first candidate for each term.
 
 ## 2.3 Research established translations
 
 For each candidate term, use web search to find whether an official or widely-used translation already exists in each target language:
 
 - Search: `"<term>" translation <target language>` and `"<term>" <target language> official localization`
-- Prefer: publisher/vendor official localizations → widely-adopted community translations → professional dictionaries
+- Prefer: publisher/vendor official localizations (for `fintech`: the client's existing legal translations, then the regulator's published glossary) → widely-adopted community translations → professional dictionaries
 - If multiple translations coexist, pick the most authoritative one as the rendering you'll propose — there's no separate "variants" slot in the platform's glossary schema, so don't try to record alternatives alongside it.
 - If a translation is known to be misleading or actively wrong, don't create a term for it at all — the glossary only stores what to use, not what to avoid. Note the risk for the `translate` skill to watch for manually instead (there is no `forbidden` concept on the platform).
 
