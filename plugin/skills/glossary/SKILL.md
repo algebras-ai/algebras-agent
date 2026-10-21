@@ -1,7 +1,7 @@
 ---
 name: glossary
 description: Phase 2 of the Algebras translation workflow (Glossary Bootstrap) — extract candidate terms, research established translations, and create a validated glossary on the Algebras platform. Requires a completed project.json from the onboard phase.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__list_glossaries, mcp__algebras__create_glossary, mcp__algebras__get_glossary, mcp__algebras__create_glossary_term, mcp__algebras__bulk_create_glossary_terms]
+allowed-tools: [Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__list_glossaries, mcp__algebras__create_glossary, mcp__algebras__get_glossary, mcp__algebras__create_glossary_term, mcp__algebras__bulk_create_glossary_terms]
 ---
 
 # Phase 2 — Glossary Bootstrap

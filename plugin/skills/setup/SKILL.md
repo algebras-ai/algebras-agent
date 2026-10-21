@@ -1,7 +1,7 @@
 ---
 name: setup
 description: Set up the Algebras translation agent — copies workflow files, registers MCP, and obtains the API key via browser device authorization (or a cached/env-provided key when possible)
-allowed-tools: [Bash, Read, Write, Edit]
+allowed-tools: [Read, Write, Edit]
 ---
 
 You are setting up the Algebras translation agent for the user's project. Follow these steps exactly.

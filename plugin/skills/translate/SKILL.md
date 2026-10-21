@@ -1,7 +1,7 @@
 ---
 name: translate
 description: Phase 3 of the Algebras translation workflow (Translation) — check each batch for ambiguity (resolved/open/conflict facts), translate it via the Algebras MCP tools with the glossary and resolved facts, measure fluency as the project's setting says (context-free on a no-glossary translation, context-aware on the written text with neighbors and locks, both, or none), and run a mid-batch consistency check against everything already translated. Requires a completed project.json and a confirmed glossary.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms]
 ---
 
 # Phase 3 — Translation
