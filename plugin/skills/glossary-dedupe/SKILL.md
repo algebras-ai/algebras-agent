@@ -1,7 +1,7 @@
 ---
 name: glossary-dedupe
 description: Optional glossary maintenance — fetches every term from the glossary's Algebras platform record and checks for exact duplicates, near-duplicate variants, and conflicting canonical translations. Always confirm with the user before running. Usable standalone at any point once a glossary exists, and referenced from the translate skill before the first batch of a session.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, mcp__algebras__list_glossary_terms, mcp__algebras__update_glossary_term, mcp__algebras__delete_glossary_term]
+allowed-tools: [Read, Write, Edit, Glob, Grep, mcp__algebras__list_glossary_terms, mcp__algebras__update_glossary_term, mcp__algebras__delete_glossary_term]
 ---
 
 # Glossary Deduplication (optional maintenance)

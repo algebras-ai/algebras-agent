@@ -1,7 +1,7 @@
 ---
 name: onboard
 description: Phase 1 of the Algebras translation workflow (Project Onboarding) — discover source files, understand the domain, pick the flow, take in client context without blocking, choose the fluency checks, and generate project.json and parsing tools. Entry point of the pipeline; run at the start of every new session or whenever project.json is missing or incomplete.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep]
+allowed-tools: [Read, Write, Edit, Glob, Grep]
 ---
 
 # Phase 1 — Project Onboarding

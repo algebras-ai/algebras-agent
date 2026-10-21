@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Phase 4 of the Algebras translation workflow (QA Review) — local QA with the project flow's checks, full-corpus terminology consistency, reading the fluency scores captured during translation (context-free baseline and/or context-aware decisions, no new calls), reviewer-agent proofreading, and the context report. Requires at least one batch already translated and written to disk.
-allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch]
 ---
 
 # Phase 4 — QA Review
