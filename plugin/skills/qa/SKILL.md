@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Phase 4 of the Algebras translation workflow (QA Review) — local QA with the project flow's checks, full-corpus terminology consistency, reading the fluency scores captured during translation (context-free baseline and/or context-aware decisions, no new calls), reviewer-agent proofreading, and the context report. Requires at least one batch already translated and written to disk.
-allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__get_project_context, mcp__algebras__list_strings]
 ---
 
 # Phase 4 — QA Review
@@ -9,6 +9,7 @@ allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)
 ## Prerequisites
 
 - Requires at least one batch already translated and written to the target file(s) (Phase 3, step 3.3) for the language/rows in scope — this phase has nothing to check against otherwise. If nothing has been translated yet: invoke the `translate` skill (`algebras-agent:translate`) first, or read `skills/translate/SKILL.md` if skill invocation isn't available in this session.
+- Context comes from the Algebras platform project named by `project.json`'s `project_id` (`CONTEXT_REQUIREMENTS.md`, "Where context lives"). At the start of this phase, read it fresh — `get_project_context`, and `list_strings` to the end of its cursor — since people may have edited it in the platform UI during translation. Refresh `tools/context_cache.json` from it if a local tool needs the context.
 - 4.2's full-corpus consistency tool (`tools/check_term_consistency.<ext>`) should already exist from the `translate` skill's 3.4 first run; if it doesn't, generate it here (see 4.2) before proceeding.
 
 ## 4.1 Local QA
@@ -18,7 +19,7 @@ After each translation batch, run all available tools in `tools/`, plus the chec
 - **Numeric preservation** — all numbers match source. Fintech: currency codes, IBANs, masked card numbers and license numbers match too.
 - **Mixed-language / source leakage** — no untranslated segments, except names the flow's `keep` list leaves as in the source
 - **Flow-specific** — edtech: option count, option order and the marked correct option are unchanged, and feedback still names that option. Fintech: a locked status uses the glossary term, and a legally locked string doesn't read weaker than the source (a finding for the user, never an automatic rewrite). SaaS: ICU and placeholder syntax match, and a help article uses the same label as the translated UI button. Games: tags intact, and a `resolved` formality marker the target doesn't use is a finding to review.
-- **Resolved facts honored** — a string whose `context_facts.jsonl` entry has a `resolved` fact (speaker gender, address form, referent, item role) uses it; a string with an unresolved fact doesn't commit to it unless it is tagged `agent-choice` or `provisional`.
+- **Resolved facts honored** — a string whose platform context has a confirmed fact (speaker gender, address form, referent, item role) uses it; a string with an unresolved fact doesn't commit to it unless it is tagged `agent-choice` or `provisional` (`tags` in `tools/fluency_scores.jsonl`).
 
 Glossary terminology and cross-batch consistency are handled separately and more rigorously — see the `translate` skill's 3.4 (mid-batch) and 4.2 below (full-corpus).
 
@@ -99,7 +100,7 @@ Regenerate `fluency_report.csv` in the project root from the full `tools/fluency
 For large files or full coverage passes, dispatch a read-only reviewer agent per language (or language group). Provide it:
 - File path, row range, source field, and target language field
 - All available context columns (`Comment`, `Speaker`, `Addressee`, `Dialogue Trigger`, etc.)
-- The `resolved` facts for those rows from `context_facts.jsonl`, and which rows are tagged `agent-choice` or `provisional`
+- The confirmed facts for those rows from the platform context, and which rows are tagged `agent-choice` or `provisional`
 - The active glossary
 
 Reviewer agents must not edit files. They report findings in this format:
@@ -131,7 +132,7 @@ After each batch:
   - Not locks: strings tagged `agent-choice` or `provisional`, and glossary candidates left unlocked
   - Unscored strings, and strings marked "revised after scoring"
   - All of it labeled a self-check of the agent's own translation, not independent QA
-- Context: coverage per section from `project.json`'s `context_coverage`, screenshot coverage, open facts per language from `context_facts.jsonl`, and the top client questions ranked by strings unblocked, with a pointer to `client_questions.md`
+- Context, from the platform project: coverage per section from `project.json`'s `context_coverage`, screenshot coverage, `flagged` strings (conflicts) and strings with missing facts per target language (`list_strings` with `flagged` and `missingFact`), and the top client questions from the project's `question` notes ranked by strings unblocked. Regenerate `client_questions.md` from those notes and point to it
 - Edits applied
 - Remaining issues for user review
 
@@ -139,7 +140,7 @@ After each batch:
 
 When the user is done with this run (no more batches to translate now), and the work is on a git branch (see the `translate` skill's 3.0; skip this step when running non-interactively in CI — the action commits itself):
 
-1. Show `git status` and propose a commit containing the translated files, `project.json`, `fluency_report.csv`, `context_pack.json`, `context_facts.jsonl` and `client_questions.md`. Leave `tools/` and the logs under it (`fluency_scores.jsonl`, `consistency_findings.jsonl`, caches) out unless the user wants them committed. Confirm with the user before committing.
+1. Show `git status` and propose a commit containing the translated files, `project.json`, `fluency_report.csv` and `client_questions.md`. The context itself is on the platform project; leave `context_pack.json` and `context_facts.jsonl` (onboard's import input) out unless the user wants them committed. Leave `tools/` and the logs under it (`fluency_scores.jsonl`, `consistency_findings.jsonl`, `context_cache.json`, other caches) out unless the user wants them committed. Confirm with the user before committing.
 2. Commit with a descriptive message, e.g. `Localize <project name>: <languages> via Algebras`.
 3. Tell the user the branch name and how to review it — `git diff <base branch>...HEAD`, or push the branch and open a pull request. **Never push or open a pull request unless the user asks.**
 

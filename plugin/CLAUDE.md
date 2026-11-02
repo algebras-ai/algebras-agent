@@ -4,7 +4,7 @@ This agent helps human translators produce the best possible machine translation
 
 | Phase | Skill | Purpose | Prerequisite |
 |---|---|---|---|
-| 1 | `onboard` | Discover files, pick the flow, take in client context (coverage, facts, client questions), choose the fluency checks, generate `project.json` and parsers | None — entry point |
+| 1 | `onboard` | Discover files, pick the flow, take in client context (coverage, facts, client questions), choose the fluency checks, generate `project.json` and parsers, and import the strings and context into the Algebras platform project | None — entry point |
 | 2 | `glossary` | Extract, research, and confirm project terminology | Complete `project.json` |
 | 3 | `translate` | Check each batch for ambiguity, translate it with the glossary and resolved facts, measure fluency as the project's setting says (context-free, context-aware, both, or none), and mid-batch consistency-check it | Complete `project.json` + confirmed glossary |
 | 4 | `qa` | Local QA with the flow's checks, full-corpus consistency, reviewer pass, and reporting the fluency scores `translate` already captured (no new calls) plus context coverage | At least one batch already translated |
@@ -50,8 +50,9 @@ In a git repository, the work lands on its own branch (`algebras/localize-<YYYYM
 
 ### Context
 
+- The Algebras platform project is the single source of truth for context: project context, per-string facts and client questions. `project.json`'s `project_id` names it. Read and write it through the `algebras` MCP server's context tools (`get_project_context`, `update_project_context`, `list_strings`, `get_string_context`, `update_string_contexts`, `list_context_changes`, and `import_project` in onboard). Every write passes the record's `baseVersion` and a `source`; after a refused write, re-read, retry once, then report to the user. Local context files are import input, caches or exports, never the store — see "Where context lives" in `CONTEXT_REQUIREMENTS.md`.
 - Never guess a context fact. A fact is resolved only from a cited source: a client file, a column in the source table, an official page for the same UI, or an explicit user answer. An inference stays a `candidate` until the user confirms it.
-- Missing context never blocks the pipeline. Unresolved facts stay `open`, go to `client_questions.md`, and translation uses wording that does not commit to the unknown fact.
+- Missing context never blocks the pipeline. Unresolved facts stay `open`, become client questions on the platform project (exported to `client_questions.md`), and translation uses wording that does not commit to the unknown fact.
 - Ask little at the start. The intake step shows one coverage table and at most 5 questions, ranked by how many strings each answer unblocks. Everything else goes to the client question list.
 - Only `resolved` facts and glossary hits are locks — for translation and for context-aware fluency. `agent-choice`, `provisional` and `glossary-candidate` never are.
 - What to collect is specified in `CONTEXT_REQUIREMENTS.md`. Which of that a project needs is the flow in `PROJECT_TYPES.md`: `games`, `edtech`, `fintech`, `saas`, or `general`.

@@ -1,7 +1,7 @@
 ---
 name: onboard
-description: Phase 1 of the Algebras translation workflow (Project Onboarding) — discover source files, understand the domain, pick the flow, take in client context without blocking, choose the fluency checks, and generate project.json and parsing tools. Entry point of the pipeline; run at the start of every new session or whenever project.json is missing or incomplete.
-allowed-tools: [Read, Write, Edit, Glob, Grep]
+description: Phase 1 of the Algebras translation workflow (Project Onboarding) — discover source files, understand the domain, pick the flow, take in client context without blocking, choose the fluency checks, generate project.json and parsing tools, and sync the strings and context to the Algebras platform project. Entry point of the pipeline; run at the start of every new session or whenever project.json is missing or incomplete.
+allowed-tools: [Read, Write, Edit, Glob, Grep, mcp__algebras__import_project, mcp__algebras__get_project_context, mcp__algebras__list_strings, mcp__algebras__update_project_context, mcp__algebras__update_string_contexts, mcp__algebras__get_string_context]
 ---
 
 # Phase 1 — Project Onboarding
@@ -11,9 +11,11 @@ The agent is format-agnostic. Do not assume any particular file extension, colum
 ## Prerequisites
 
 - None — this is the entry point of the four-phase pipeline (**Onboard → Glossary → Translate → QA**).
-- If `project.json` already exists at the project root and every field is populated with real, non-placeholder values, this phase is already satisfied: confirm that with the user and move straight to the `glossary` skill (`algebras-agent:glossary`, or read `skills/glossary/SKILL.md` if skill invocation isn't available in this session). A `project.json` that lacks `project_type`, `fluency`, `context_files` (as a map by section), `context_coverage`, `screenshot_coverage`, `client_questions_file` or `file_flows` is incomplete — run the missing steps (1.2a, 1.2b, 1.2d) and fill those fields instead of skipping ahead. Keep every answer the user already gave; don't re-ask.
+- If `project.json` already exists at the project root and every field is populated with real, non-placeholder values, this phase is already satisfied: confirm that with the user and move straight to the `glossary` skill (`algebras-agent:glossary`, or read `skills/glossary/SKILL.md` if skill invocation isn't available in this session). A `project.json` that lacks `project_type`, `fluency`, `context_files` (as a map by section), `context_coverage`, `screenshot_coverage`, `client_questions_file` or `file_flows` is incomplete — run the missing steps (1.2a, 1.2b, 1.2d) and fill those fields instead of skipping ahead. A `project.json` without `project_id` has not been synced to the platform: run 1.6. Keep every answer the user already gave; don't re-ask.
 
 ## 1.0 Project type
+
+**Platform-only project.** If the working directory has no translation files and the user names an existing Algebras platform project (by id or name), the platform already holds the strings and their context. Read it with `get_project_context` and `list_strings`, write a `project.json` with its `project_id`, source and target languages, and the glossary id the project links to, skip 1.1–1.4 and 1.6, ask 1.2d if `fluency` isn't set, and show the 1.5 summary from what the platform returned. Translations are then written back to the files the user points to, or the user is asked where they go.
 
 Check whether the user declared a project type — e.g. `Project type: saas` or "Use the games flow" in their prompt. Valid types: `games`, `edtech`, `fintech`, `saas`, `general`. If none was declared, don't ask: 1.2a infers it from the strings, falling back to `general`.
 
@@ -59,6 +61,8 @@ Status is `present`, `partial`, `missing`, or `not needed for this content type`
 
 **Web product pass.** Once per project, search the product's official site, store page and wiki (see `CONTEXT_REQUIREMENTS.md`, "Web product pass"). Open the page, quote the line that supports a fact, and keep the URL — a search snippet is not evidence. A marketing page that uses du/Sie or tu/vous is a clue; it resolves the address form only when it shows this same UI, or the project has an explicit setting. Two official sources that disagree become a `conflict` with both URLs.
 
+The platform project is where context lives (`CONTEXT_REQUIREMENTS.md`, "Where context lives"). The files this step writes are the input for the import in 1.6: they let the intake run and be tested locally before anything is sent.
+
 **Context pack.** Write `context_pack.json` in the project root from cited sources only, using the fields the flow lists under "Context pack" (characters and formality matrix for `games`; audience and quiz item roles for `edtech`; audience, locked statuses and legally locked ids for `fintech`; one address form, feature names and limits for `saas`). A formality cell the source marks as a client decision is `null`, not a default. Don't invent entries.
 
 **Facts per string.** For each target language, record the facts the flow lists for that string. Language-forced person facts (speaker gender, addressee gender, addressee number, formality, pronoun referent, placeholder meaning) follow the table in `CONTEXT_REQUIREMENTS.md` and apply to dialogue, not to every UI label — re-check that table for the actual target languages. A fact is `resolved` only from a cited source: a client file, a column in the source table (`Speaker`, `Addressee`, `Comment`, `Context`, `Max length`, `Screenshot`, or a column that plays the same role), an official page quoted in the web pass, or an explicit user answer. An inference stays a `candidate` until the user confirms it. A matrix cell the source left for the client is a `conflict`. Anything else stays `open`. Don't guess.
@@ -76,11 +80,13 @@ Generate a reusable tool, `tools/context_facts.py`, if `tools/` doesn't already 
 
 Test the tool on a small sample before running it on the full file. Count the unresolved (`open`, `candidate`, `conflict`) facts per type and language.
 
+Give each line the string's `externalKey` (`<file>#<id or row>`, see `CONTEXT_REQUIREMENTS.md`, "Where each fact goes"). 1.6 uses it to match the line to the platform string, now and on every later import.
+
 **Questions.** Use the flow's question list. Skip any question whose string count is 0. Phrase questions about facts, not about sections — "Who speaks rows 120 to 340, and to whom?", not "Please provide a social graph". Rank them by how many strings an answer would unblock (strings where it resolves at least one unresolved fact). Show the coverage table and at most 5 questions; every other question goes only to `client_questions.md`.
 
 **Screenshots.** Link them in the order in `CONTEXT_REQUIREMENTS.md`: a table column, then a file named after the string key or row, then a capture spec. `screenshot_coverage` is the fraction of strings linked to a screenshot (0.0–1.0). Every flow needs screenshots for UI strings. If none are linked, one of the 5 questions is the single screenshot ask — screenshots in a column, files named by key, or a playable build. Ask it once. If they have a playable build and want automated capture, write a runner spec into `tools/` (Playwright for browser, PyAutoGUI for desktop, Appium for mobile) and don't run it without explicit later permission. If the content has no UI, the status is `not needed for this content type` and there is no screenshot question.
 
-**Client question list.** Write `client_questions.md` in the project root, for the project manager to forward to the client. Deduplicate. Each question records the fact type, the affected languages, the number of strings it unblocks, and 2 example rows:
+**Client question list.** Each question becomes a `question` note on the platform project in 1.6. Write `client_questions.md` in the project root as the copy for the project manager to forward to the client. Deduplicate. Each question records the fact type, the affected languages, the number of strings it unblocks, and 2 example rows:
 
 ```markdown
 # Client questions
@@ -95,7 +101,7 @@ Test the tool on a small sample before running it on the full file. Count the un
   - Row 134: "You never listen."
 ```
 
-Don't wait for answers before 1.3. Whenever the user answers — during the 1.5 confirmation or later — set the fact to `resolved` with source `user` in `context_facts.jsonl` (and `context_pack.json` if it's a project-level object), and update `client_questions.md`.
+Don't wait for answers before 1.3. An answer that comes before 1.6 goes into the import files: the fact becomes `resolved` with source `user` in `context_facts.jsonl` (or `context_pack.json` for a project-level object), and the question leaves `client_questions.md`. An answer after 1.6 is written to the platform the way the translate skill writes facts (3.1b): `update_string_contexts` or `update_project_context` with `baseVersion` and source `{"kind": "user"}`, the question note updated, and `client_questions.md` regenerated from the notes.
 
 ## 1.2c Existing translations (translation memory)
 
@@ -134,6 +140,7 @@ Write `project.json` based on what you've discovered. Do not copy a template —
   },
   "non_latin_langs": [],
   "glossary_id": null,
+  "project_id": null,
   "mcp_url": "https://platform.algebras.ai/api/mcp",
   "notes": "<any other project-specific context worth remembering>",
   "context_files": { "<section>": ["<relative path>", "..."] },
@@ -147,6 +154,8 @@ Write `project.json` based on what you've discovered. Do not copy a template —
 `project_type` comes from 1.2a and is what later phases use to pick the flow from `PROJECT_TYPES.md`; `domain` follows it (`games` → `game`, `edtech` → `edtech`, `fintech` → `fintech`, `saas` → `software`; for `general`, derive `domain` from the files). `fluency` comes from 1.2d.
 
 The context fields come from 1.1 and 1.2b. `context_files` is keyed by section — `glossary`, `history`, `universe`, `tone_of_voice`, `social_graph`, `screenshots`, `integrations`, `files` — with `[]` when a section has no file. `context_coverage` stores `present`, `partial`, `missing` or `not_needed` per section. `screenshot_coverage` is a fraction from 0.0 to 1.0. `file_flows` maps a translation file to its flow when `project_type` is `general`; otherwise it is `{}`.
+
+`project_id` stays `null` here — 1.6 imports the project to the Algebras platform and fills it in. On a platform-only project (1.0) it is the id of the project the user named.
 
 `glossary_id` stays `null` here — the `glossary` skill (Phase 2) creates the glossary on the Algebras platform and fills this in. There is no local glossary directory or file to set up.
 
@@ -165,9 +174,23 @@ A parser must:
 
 Name parsers `tools/parse_<format>.<ext>`. **Generate tools on demand, not ahead of time.** Before writing a new tool, check `tools/` for an existing one that covers the need.
 
+## 1.6 Sync to platform
+
+Import the project into the Algebras platform, which holds its context from now on. Map the files from 1.2b by the tables in `CONTEXT_REQUIREMENTS.md` ("How a status is stored on the platform", "Where each fact goes"):
+
+- **Project:** `name`, `sourceLang`, `targetLangs` and `type` from `project.json` (`games` → `GAME`; `saas` and `fintech` → `APP_UI`; others by `domain`: `marketing` → `MARKETING`, `subtitles` → `SUBTITLES`, `document`/`legal` → `DOCUMENT`, a website → `WEBSITE`, else `OTHER`), and `glossaryId` if `glossary_id` is already set.
+- **Project context**, from `context_pack.json`: `description` from the universe or product description; `characters` (id = a slug of the name) with gender; `relations` with `register` per language from the formality matrix (a cell the client must decide is `null`); `defaults.userRegister` for the product's one address form; `style.tone` and `style.brief` from the tone-of-voice files; `notes`: settled decisions from History & decisions as `decision`, and every client question from 1.2b as `question` (the fact, the languages, the strings it unblocks, two example rows).
+- **Strings**, one per source string: `externalKey`, `sourceText`, and its `context` built from that string's `context_facts.jsonl` lines (all target languages merged into one record). `resolved` → `confirmed` with its source; `candidate` → `suggestion`, reason in the source's `quote`; `conflict` → the fact is left out, the string is `flagged`, and its readings are in a `question` note; `open` → the fact is left out. Column hints (`Max length`, `Context`, `Screenshot`) go into `placement` and `discourse`.
+
+Generate `tools/platform_import.py` (generic: reads `project.json`, `context_pack.json` and `context_facts.jsonl`, prints the payload as JSON) if `tools/` doesn't have it, and check its output on a few strings with every status before sending the full set.
+
+Call `import_project` with the payload. If `project.json` already has a `project_id`, pass it: the import then updates that project, matching strings by `externalKey`, so re-running 1.6 after a change to the files updates the same strings instead of creating new ones. Send large projects in chunks of about 200 strings per call (pass the `project_id` from the first call to the rest). Write the returned `project_id` into `project.json` right after the first call, so a crash doesn't orphan the project.
+
+Then read it back: `get_project_context`, and `list_strings` for the string count, the `flagged` count and, per target language, the strings with missing facts. Compare them with the local counts from 1.2b and report any difference to the user before 1.5. Translate and QA read context from the platform from here on.
+
 ## 1.5 Project summary
 
-Before any translation work, output a summary and wait for user confirmation:
+Run 1.6 first, so the summary reports what the platform holds. Before any translation work, output a summary and wait for user confirmation:
 
 > **Project summary**
 > - Project type: [games / edtech / fintech / saas / general] — [declared / inferred / default] [· per-file flows for `general`] [· note any mismatch with what the files contain]
@@ -176,6 +199,7 @@ Before any translation work, output a summary and wait for user confirmation:
 > - Targets: [list of target languages]
 > - Existing translations: [per language: N of M segments already translated — kept, not re-translated]
 > - Context: [one line per present or partial section — section, status, source file; "no client context files found" if none] · screenshot coverage [N%]
+> - Platform project: [project_id] · [N strings] · [M flagged] — context is read from and written to the platform from here on
 > - Open facts: [unresolved facts per target language, and the single top question — full list in `client_questions.md`]
 > - Fluency checks: [none / isolated / context / both]
 > - Glossary: [N active terms / empty / missing]

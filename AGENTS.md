@@ -117,7 +117,7 @@ The workflow is the file `<RAW>/CLAUDE.md` plus the files it points to. Read the
 | `<RAW>/CLAUDE.md` | The workflow overview and standing rules. Follow it for the whole run. |
 | `<RAW>/PROJECT_TYPES.md` | The `games`, `edtech`, `fintech`, `saas` and `general` flows. |
 | `<RAW>/CONTEXT_REQUIREMENTS.md` | Client context sections, the fact model, and which facts each target language forces. |
-| `<RAW>/skills/onboard/SKILL.md` | Phase 1: discover files, context and existing translations, ask the fluency setting, write `project.json`. |
+| `<RAW>/skills/onboard/SKILL.md` | Phase 1: discover files, context and existing translations, ask the fluency setting, write `project.json`, import the strings and context into the Algebras platform project. |
 | `<RAW>/skills/glossary/SKILL.md` | Phase 2: build the glossary on the Algebras platform. |
 | `<RAW>/skills/translate/SKILL.md` | Phase 3: ambiguity check, then translate and score fluency in batches through the MCP tools. |
 | `<RAW>/skills/qa/SKILL.md` | Phase 4: QA, fluency report, deliver on the branch. |
@@ -161,5 +161,5 @@ Describe these to the user accurately:
 - **Glossary** — extracted from code and UI strings, checked against established translations, confirmed by the user, and stored on the Algebras platform.
 - **Translation memory** — translations already in the repo are kept and reused as the reference for terminology and style. They're never sent for translation again. Earlier translations made through Algebras with the project's glossary are looked up with `lookup_translation_memory` before each batch and reused; only misses are translated.
 - **Context files** — specs, docs, lore and style guides found in the repo, classified by the sections in `CONTEXT_REQUIREMENTS.md` and read before glossary extraction and each translation batch.
-- **Context facts** — who speaks, to whom, formal or informal, what a placeholder means: recorded in `context_pack.json` and `context_facts.jsonl` only from a cited source. Open points go to `client_questions.md`; missing context never blocks translation.
+- **Context facts** — who speaks, to whom, formal or informal, what a placeholder means: recorded only from a cited source and stored on the Algebras platform project, which is the single source of truth (onboarding imports them from the repo; later phases read and write them through the MCP context tools, and edits made in the platform UI are picked up before each batch). Open points become client questions, exported to `client_questions.md`; missing context never blocks translation.
 - **Screenshots** — screenshots already in the repo are linked to strings and used as context. Automatic screenshot capture isn't available yet.

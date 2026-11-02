@@ -1,16 +1,26 @@
 ---
 name: translate
 description: Phase 3 of the Algebras translation workflow (Translation) — check each batch for ambiguity (resolved/open/conflict facts), reuse matching translations from translation memory, translate only the misses via the Algebras MCP tools with the glossary and resolved facts, measure fluency as the project's setting says (context-free on a no-glossary translation, context-aware on the written text with neighbors and locks, both, or none), run a mid-batch consistency check against everything already translated, and fix glossary misses in one final glossary pass after all batches. Requires a completed project.json and a confirmed glossary.
-allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__lookup_translation_memory]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__lookup_translation_memory, mcp__algebras__get_project_context, mcp__algebras__update_project_context, mcp__algebras__list_strings, mcp__algebras__get_string_context, mcp__algebras__update_string_contexts, mcp__algebras__list_context_changes]
 ---
 
 # Phase 3 — Translation
 
 ## Prerequisites
 
-- Requires a complete `project.json` (Phase 1). If it's missing or incomplete: invoke the `onboard` skill (`algebras-agent:onboard`) first, or read `skills/onboard/SKILL.md` if skill invocation isn't available in this session.
+- Requires a complete `project.json` (Phase 1) with a `project_id` (onboard 1.6, or a platform-only project from onboard 1.0). If it's missing or incomplete: invoke the `onboard` skill (`algebras-agent:onboard`) first, or read `skills/onboard/SKILL.md` if skill invocation isn't available in this session.
 - Requires a glossary that has been through user confirmation (Phase 2, step 2.4) — an intentionally-empty glossary is fine, as long as the user explicitly agreed to proceed without one. If the glossary hasn't been confirmed yet: invoke the `glossary` skill (`algebras-agent:glossary`) first, or read `skills/glossary/SKILL.md`.
 - Never translate against a glossary term still flagged low-confidence — resolve it with the user first.
+- Context comes from the Algebras platform project, not from local files (`CONTEXT_REQUIREMENTS.md`, "Where context lives"). This phase needs no `context_pack.json` or `context_facts.jsonl` and never creates them.
+
+## Session start: read the context
+
+Once per session, before the first batch:
+
+1. `get_project_context` with `project.json`'s `project_id`. Keep the project context and its `version`.
+2. `list_strings`, following the cursor to the end. Keep each string's context and `version`, and the project's context version as `last_seen_version`.
+
+Keep this in memory. When a local tool needs the context (e.g. `tools/fluency_ctx.py` in 3.3b), write it to `tools/context_cache.json` and pass that file to the tool; it's a disposable copy, refreshed whenever the context is re-read, and never edited by hand.
 
 ## Optional: glossary deduplication
 
@@ -33,6 +43,8 @@ The `qa` skill's 4.6 commits the result on this branch at the end.
 
 ## 3.1 State rules before each batch
 
+**Pull changes first.** People edit context in the platform UI while the agent works. Before each batch, call `list_strings` with `changedSinceVersion` = `last_seen_version`, and `list_context_changes` for who changed what. Replace the changed strings' contexts (and the project context, if it changed) with the fresh copies and advance `last_seen_version`. If a change touches a string in this batch, or a fact a string already written relied on, tell the user what changed and who changed it; for strings already written, list them and ask whether to retranslate.
+
 Read the translation rules for `project.json`'s `project_type` in `PROJECT_TYPES.md`. If `file_flows` names a flow for this file, use that flow's rules instead.
 
 Before translating any batch, declare:
@@ -40,7 +52,7 @@ Before translating any batch, declare:
 - Glossary terms that apply to this batch, using the flow's glossary emphasis
 - The flow's constraints (timing sensitivity, placeholder syntax, profanity intensity, character limits; for games: tags, VO length, short UI; for edtech: assessment lock and reading level; for fintech: locked statuses and legally locked strings; for saas: ICU and length)
 - Which `context_files` (from `project.json`) are relevant to this batch — read them before translating it
-- The `resolved` facts for this batch, each with its source, and the facts that are still `open`, `candidate` or in `conflict` — from `context_facts.jsonl` and `context_pack.json`, after 3.1b
+- The `resolved` facts for this batch, each with its source, and the facts that are still `open`, `candidate` or in `conflict` — from the platform context read above, after 3.1b
 - Which fluency checks run, from `project.json`'s `fluency` (see 3.2)
 
 Only send segments that don't have a translation yet. Segments that are already translated in the repo (onboard 1.2c) are kept as-is and used as reference — don't retranslate or overwrite them unless the user explicitly asks. The batch's untranslated segments go to translation memory first (3.2.0); only its misses are translated in 3.2.
@@ -60,12 +72,14 @@ Before translating, find what the batch's strings leave undecided — the points
 2. **Forced form** — gender, number, case; whether a placeholder like `{0}` or `[1]` is a name, a count, or a noun that inflects; the address form (tu/vous, du/Sie, ты/вы, tú/usted) — one choice per file or per speaker pair. A string with no address gets no formality fact.
 3. **UI role** — label, button or description, which decides noun, imperative or infinitive for the whole cluster.
 
-Give each point a status: `resolved` when `context_pack.json`, `context_facts.jsonl`, a cited string id, a source column, a screenshot or a quoted official page decides it; `conflict` when two sources or two string groups point different ways; otherwise `open`. For points still `open` or in `conflict`, run one leftover web search each (product name plus the string), open the page and quote the line; a page that disagrees with an existing source makes the point a `conflict`. Write each new or updated fact to `context_facts.jsonl` for the string and language it applies to.
+Give each point a status: `resolved` when the platform context (a confirmed fact), a cited string id, a source column, a screenshot or a quoted official page decides it; `conflict` when two sources or two string groups point different ways; otherwise `open`. For points still `open` or in `conflict`, run one leftover web search each (product name plus the string), open the page and quote the line; a page that disagrees with an existing source makes the point a `conflict`.
+
+**Write the facts to the platform.** Store each new or changed fact as `CONTEXT_REQUIREMENTS.md` maps it ("How a status is stored on the platform", "Where each fact goes"): string facts with `update_string_contexts` — one call per batch, up to about 200 items, each with the string's `baseVersion` and the fact's `source` — and project facts (a character's gender, a relation's register, a question note) with `update_project_context` and the project's `baseVersion`. A `conflict` sets the string's `flagged` and adds or extends a `question` note with both readings. Keep the versions the results return. Each item comes back `ok`, `conflict` or `invalid`; follow "Writes" in `CONTEXT_REQUIREMENTS.md` for the last two: re-read, retry once, then report to the user without overwriting.
 
 **Handoff to 3.2:**
 - `resolved` — a hard constraint; pass it with its evidence.
-- `open` — the translation may commit to a reading only where the wording can't avoid it; tag that string `agent-choice` in its fact entry. An `agent-choice` is never evidence for another string.
-- `conflict` — write one document note for the file (both readings, both sources), add the question to `client_questions.md`, and tag any wording that commits to a reading `provisional`.
+- `open` — the translation may commit to a reading only where the wording can't avoid it; tag that string `agent-choice` (in its fluency log line, `tags`) and write the reading as a `suggestion` with no source. An `agent-choice` is never evidence for another string.
+- `conflict` — write one document note for the file (both readings, both sources), make sure the platform has the `question` note and the string is `flagged`, and tag any wording that commits to a reading `provisional` (in its fluency log line, `tags`).
 
 Show the batch's ambiguity table before translating it, in the user's language:
 
@@ -130,13 +144,13 @@ Pick the tool per step, independently:
 
 **`contexts` and `prompt` on the translate steps.** Pass `contexts` (per-text, aligned by index) on steps 1 and 3 whenever you have row-level context — the API doesn't see your project's columns unless you hand it over:
 - Row columns that help (`Comment`, `Speaker`, `Addressee`, `Context`, `Max length`, etc.).
-- The `resolved` facts from `context_facts.jsonl` for that string and language, and the matching objects from `context_pack.json`.
+- The `resolved` (confirmed) facts from the string's platform context for that language, and the matching project objects (the speaker's and addressee's characters, the relation's register, the style brief).
 - When the flow says neighbors matter, up to three source lines before the string and three after.
 - Never send a `candidate`, `conflict` or `open` fact as if it were resolved, and never an `agent-choice` as evidence.
 
 For a string with an unresolved fact, add a `prompt` instruction to choose wording that doesn't commit to it (a gender-neutral construction; a phrasing that avoids tu/vous until formality is known). Never invent a speaker, a learner's gender, or a customer's gender. Apply the rest of the flow's translation rules: games keep tags and don't choose an open formality; edtech keeps the marked correct option, the option order and the difficulty; fintech uses the locked status term, leaves identifiers and currency codes, and doesn't soften a legally locked string; saas keeps ICU and the length limit.
 
-If the user answers a client question mid-run, update the matching lines in `context_facts.jsonl` (`resolved`, source `user`) and `client_questions.md`, then continue the current batch with those facts. Don't retranslate strings already written — list the affected string ids and ask whether to retranslate them.
+If the user answers a client question mid-run, write the answer to the platform: `update_string_contexts` for the strings it decides (confirmed, source `{"kind": "user"}`, clear `flagged` when it settles the conflict) or `update_project_context` for a project-level fact, with `baseVersion` as in 3.1b, and update or remove the `question` note. If `client_questions.md` exists, regenerate it from the notes. Then continue the current batch with those facts. Don't retranslate strings already written — list the affected string ids and ask whether to retranslate them.
 
 **Apply glossary terms exactly (step 3).** For source terms not yet in the glossary:
 1. Search the web for established translations before coining your own.
@@ -193,7 +207,7 @@ Notes: <optional short facts, e.g. speaker/addressee>
 
 Never put glossary hit counts, fluency scores, the reasons from the decision log, or another translator's text into `context`. Keep it within 6,000 characters (trim neighbors from the lowest weight first); a call-level `prompt`, if any, is a short project instruction (e.g. the product register) within 2,000 characters.
 
-Generate a reusable tool, `tools/fluency_ctx.py`, if `tools/` doesn't already have one: built on the Phase 1 parser, generic (no hardcoded columns, languages or paths), it computes HIT/MISS/UNSURE, picks the window and writes the `context` text per string. Test it on a small sample first.
+Generate a reusable tool, `tools/fluency_ctx.py`, if `tools/` doesn't already have one: built on the Phase 1 parser, generic (no hardcoded columns, languages or paths), it computes HIT/MISS/UNSURE, picks the window and writes the `context` text per string. It reads the `resolved` facts from `tools/context_cache.json` (written from the platform context, see "Session start") and the tags from `tools/fluency_scores.jsonl`. Test it on a small sample first.
 
 **Call.** `check_fluency_batch` with `items` of `{sourceText, translatedText, context}` (≤20 per call), or `check_fluency` with `context` for a single string. The server scores the translation, uses the neighbors only for consistency and register, and does not flag the locked choices. Log the result as the entry's `fluency_ctx`.
 
@@ -202,11 +216,12 @@ Generate a reusable tool, `tools/fluency_ctx.py`, if `tools/` doesn't already ha
 Write one line per string to `tools/fluency_scores.jsonl` when the batch's checks are done — update the line rather than adding a second one if step 2 and step 4 run at different times:
 
 ```json
-{"id": "<string/row id>", "file": "<path>", "sourceLang": "en", "targetLang": "de", "sourceText": "...", "fluency": { "value": 8.4, "idiomatic": 8, "collocational": 9, "discourse": 8, "pragmatic": 9, "calque": 8, "issue_type": "none", "severity": null, "problematic_phrase": null, "suggested_fix": null, "main_issue": null }, "fluency_ctx": { "value": 8.8, "idiomatic": 9, "collocational": 9, "discourse": 9, "pragmatic": 9, "calque": 8, "issue_type": "none", "severity": null, "problematic_phrase": null, "suggested_fix": null, "main_issue": null }, "terms": { "hit": ["Drachenstein"], "miss": [], "unsure": [] }, "term_only": false, "ctx_neighbors": ["12", "40"] }
+{"id": "<string/row id>", "file": "<path>", "sourceLang": "en", "targetLang": "de", "sourceText": "...", "fluency": { "value": 8.4, "idiomatic": 8, "collocational": 9, "discourse": 8, "pragmatic": 9, "calque": 8, "issue_type": "none", "severity": null, "problematic_phrase": null, "suggested_fix": null, "main_issue": null }, "fluency_ctx": { "value": 8.8, "idiomatic": 9, "collocational": 9, "discourse": 9, "pragmatic": 9, "calque": 8, "issue_type": "none", "severity": null, "problematic_phrase": null, "suggested_fix": null, "main_issue": null }, "terms": { "hit": ["Drachenstein"], "miss": [], "unsure": [] }, "term_only": false, "ctx_neighbors": ["12", "40"], "tags": [] }
 ```
 
 - `fluency` is the context-free score (step 2), `fluency_ctx` the context-aware score (step 4). A mode the project's setting doesn't include is `null`, never 0. A mode that ran but where the API skipped scoring (it does this for long text), or a string with no neighbors, is `null` plus `"fluency_skipped": "<reason>"` or `"fluency_ctx_skipped": "<reason>"` — that tells the `qa` skill the string was genuinely never scored, as opposed to scored-and-good.
 - `terms`, `term_only` and `ctx_neighbors` come from step 4 (empty when step 4 doesn't run).
+- `tags` lists the string's `agent-choice` and `provisional` tags from 3.1b (empty when it has none).
 - `decision`, `decision_reason` and `revised_after_scoring` are added later by the `qa` skill's 4.3.
 
 This log is the **only** source of fluency data from here on — never call `check_fluency`/`check_fluency_batch` again for a string that already has a score in that mode.

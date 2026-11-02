@@ -1,10 +1,24 @@
 # Context requirements
 
-What the translation agent expects from the client, and how that material is used. The eight sections below are the Context entity of the Algebras Agentic Workspace. A client folder laid out this way can be imported there later without conversion.
+What the translation agent expects from the client, and how that material is used. The eight sections below are the Context entity of the Algebras Agentic Workspace. Onboarding imports a client folder laid out this way into the platform project without conversion.
 
 Which sections a project needs, and which extra facts it collects, is the flow in `PROJECT_TYPES.md`: `games`, `edtech`, `fintech`, `saas`, or `general`. Games use the social graph and the speaker-to-listener matrix. The other flows use one address form for the whole product and do not build that matrix unless the file actually has speakers. The language-forced table below still decides which person facts a dialogue line needs.
 
-A fact is resolved only from a cited source: one of these files, a column in the source table, an official page for the same UI, or an explicit answer from the user (see [Fact model](#fact-model)). The agent does not guess. If a file is missing, translation still runs; the unknown fact stays open and is written into `client_questions.md` for the project manager to forward.
+A fact is resolved only from a cited source: one of these files, a column in the source table, an official page for the same UI, or an explicit answer from the user (see [Fact model](#fact-model)). The agent does not guess. If a file is missing, translation still runs; the unknown fact stays open and becomes a client question for the project manager to forward.
+
+## Where context lives
+
+The Algebras platform project is the single source of truth for context. Its project context (description, defaults, characters, relations, style, notes) and the per-string context of every string are stored on the platform, versioned, and read and written through the `algebras` MCP server's context tools: `import_project`, `get_project_context`, `update_project_context`, `list_strings`, `get_string_context`, `update_string_contexts` and `list_context_changes`. People edit the same records in the platform UI, so the agent re-reads them before each batch instead of trusting what it read earlier.
+
+`project.json`'s `project_id` names the platform project. Local files are never the store: `context_pack.json` and `context_facts.jsonl` are the import input onboard builds from the repo (see onboard 1.6), `tools/context_cache.json` is a disposable copy written only when a local tool needs the context, and `client_questions.md` is an export of the project's question notes.
+
+**Writes.** Every record carries a `version`. A write passes the version it was based on (`baseVersion`) and a `source`. A write based on a stale version is refused with a `conflict` and the server's current copy. Then the agent:
+
+1. re-reads the record (`get_string_context` or `get_project_context`);
+2. re-applies its change to the fresh copy if the change still makes sense there, and retries once;
+3. if the retry conflicts too, or the fresh copy already decides the point differently, does not overwrite it: it reports the string, the server's value and who changed it (`list_context_changes`) to the user.
+
+An `invalid` result means the payload broke the schema: fix it and retry, or report it.
 
 ## The eight sections
 
@@ -79,7 +93,7 @@ French needs both speaker gender (agreement) and tu/vous. German needs du/Sie an
 
 ## Fact model
 
-Every context fact the agent records in `context_facts.jsonl`, whether it comes from onboard intake or from the per-batch ambiguity check in translate, has one status:
+Every context fact the agent works with, whether it comes from onboard intake or from the per-batch ambiguity check in translate, has one of these statuses:
 
 | Status | Meaning | Sent to translation | Lock for context-aware fluency |
 |---|---|---|---|
@@ -88,6 +102,36 @@ Every context fact the agent records in `context_facts.jsonl`, whether it comes 
 | `conflict` | Two sources disagree, or a source says the client must decide | No | No |
 | `open` | Nothing decides it | No | No |
 
+### How a status is stored on the platform
+
+| Status | Platform record |
+|---|---|
+| `resolved` | The fact with `status: "confirmed"`, its `value`, and a `source` (`{kind, ref, quote?}`). The platform rejects a confirmed fact without a source. |
+| `candidate` | The fact with `status: "suggestion"` and its `value`. When the inference rests on something specific (a neighbouring line, a document), cite it as the `source` and put the reason in `quote`. |
+| `conflict` | The fact is not set, the string is `flagged`, and the project has a `question` note that gives every reading with its source and names the affected strings. |
+| `open` | The fact is not set. `list_strings` with `missingFact` finds these strings. |
+
+Source kinds: a client file is `document` (`ref`: path and anchor, `quote`: the line); a source-table column is `string` (`ref`: `<externalKey>:column:<name>`); another string is `string` (`ref`: its external key); a screenshot is `screenshot`; an official web page is `document` (`ref`: the URL, `quote` required); an answer from the user is `user`; a glossary card is `glossary` (`ref`: the term id).
+
+### Where each fact goes
+
+| Fact | Platform field |
+|---|---|
+| Speaker | String `speaker` (a character id; `null` for narration and UI) |
+| Speaker gender | That character's `gender` in the project context. Gender doesn't vary by target language: one value for every language, and languages that disagree make a `conflict` |
+| Addressee | String `addressee` (a character id, `"user"` for the product's user, `null` for nobody in particular) |
+| Addressee gender | That character's `gender` |
+| Addressee number | String `addresseeNumber` (`Sing` or `Plur`) |
+| Formality, per target language | `relations[].register[lang]` for a speaker-to-listener pair, `defaults.userRegister[lang]` for text addressed to the product's user, string `register[lang]` for a string that differs from both. Values `Infm` or `Form`. A matrix cell the client must decide is `null` |
+| Pronoun referent | String `referents[]` (`text`, `characterId`, `gender`, `number`) |
+| Placeholder meaning | String `placeholders[]` (`name`, `meaning`, `kind`: `count`, `name`, `number`, `date` or `other`, plus `gender`/`number` when agreement needs them) |
+| UI role, length limit, screen | String `placement` (`contentType`, `maxLength`, `screen`, `note`) |
+| Scene, section, previous line | String `discourse` |
+| Tone of voice, brief | Project `style.tone[lang]`, `style.brief[lang]` |
+| Settled decisions, open client questions | Project `notes` with `kind: "decision"` or `kind: "question"` |
+
+Each string has an `externalKey` built from its file and its id or row (`<file>#<id>`), so importing the same files again updates the same strings.
+
 Tags record how a string was handled under an unresolved point. They are never evidence and never locks:
 
 | Tag | Meaning |
@@ -95,6 +139,8 @@ Tags record how a string was handled under an unresolved point. They are never e
 | `agent-choice` | The agent picked a reading for an `open` point because the wording had to commit. The reason is a guess. |
 | `provisional` | Wording written under a `conflict`. One document note explains the conflict. |
 | `glossary-candidate` | A repeating label or formula with no approved glossary card yet. It becomes a lock only after a person adds the card. |
+
+An `agent-choice` reading is written to the platform as a `suggestion` without a source, so nobody reads it as decided; a `provisional` string stays `flagged`. The tags themselves are kept in the translate phase's fluency log (`tools/fluency_scores.jsonl`, `tags`).
 
 Glossary term status is counted locally, never by a model: `HIT` (an existing card's approved form is in the target; that span is a lock), `MISS` (approved form absent), `UNSURE` (a homograph in a segment that is not term-only; no lock). A segment whose source is only existing glossary spans is **term-only**.
 
