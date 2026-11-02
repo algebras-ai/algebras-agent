@@ -1,7 +1,7 @@
 ---
 name: translate
-description: Phase 3 of the Algebras translation workflow (Translation) — check each batch for ambiguity (resolved/open/conflict facts), translate it via the Algebras MCP tools with the glossary and resolved facts, measure fluency as the project's setting says (context-free on a no-glossary translation, context-aware on the written text with neighbors and locks, both, or none), and run a mid-batch consistency check against everything already translated. Requires a completed project.json and a confirmed glossary.
-allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms]
+description: Phase 3 of the Algebras translation workflow (Translation) — check each batch for ambiguity (resolved/open/conflict facts), reuse matching translations from translation memory, translate only the misses via the Algebras MCP tools with the glossary and resolved facts, measure fluency as the project's setting says (context-free on a no-glossary translation, context-aware on the written text with neighbors and locks, both, or none), run a mid-batch consistency check against everything already translated, and fix glossary misses in one final glossary pass after all batches. Requires a completed project.json and a confirmed glossary.
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__lookup_translation_memory]
 ---
 
 # Phase 3 — Translation
@@ -43,7 +43,7 @@ Before translating any batch, declare:
 - The `resolved` facts for this batch, each with its source, and the facts that are still `open`, `candidate` or in `conflict` — from `context_facts.jsonl` and `context_pack.json`, after 3.1b
 - Which fluency checks run, from `project.json`'s `fluency` (see 3.2)
 
-Only send segments that don't have a translation yet. Segments that are already translated in the repo (onboard 1.2c) are kept as-is and used as reference — don't retranslate or overwrite them unless the user explicitly asks.
+Only send segments that don't have a translation yet. Segments that are already translated in the repo (onboard 1.2c) are kept as-is and used as reference — don't retranslate or overwrite them unless the user explicitly asks. The batch's untranslated segments go to translation memory first (3.2.0); only its misses are translated in 3.2.
 
 ## 3.1b Ambiguity check
 
@@ -51,7 +51,7 @@ Before translating, find what the batch's strings leave undecided — the points
 
 **Freeze gate first.** A frozen span is not decomposed:
 - **Existing glossary card.** The source matches a confirmed glossary term — the approved form is required, and after translation it is counted as HIT or MISS (locally in 3.3b when the context-aware check runs; 3.4's glossary compliance check covers every setting). A **term-only** source (only existing glossary spans, e.g. `RESUME`, `Flight Dart`) stops here: no questions inside the span, and no context-aware fluency call later.
-- **Repeating label, no card.** A short label, name or status that repeats in the file without a card is a `glossary-candidate`: translate it consistently and list it for the user (glossary 2.4 flow), but it is not a lock until a card exists.
+- **Repeating label, no card.** A short label, name or status that repeats in the file without a card is a `glossary-candidate`: translate it consistently, record it in `tools/glossary_candidates.jsonl` (3.2) and list it for the user (glossary 2.4 flow), but it is not a lock until a card exists.
 - **Phraseologism.** A one-off sentence whose wording doesn't add up from its parts stays in the sentence; promote it to `glossary-candidate` only if it repeats or the user asks.
 - **Bare word, no card** (`Potato`, `Flight`): its sense is `open`. A short homograph that isn't term-only is UNSURE, never a lock.
 
@@ -72,16 +72,46 @@ Show the batch's ambiguity table before translating it, in the user's language:
 | id | freeze | question | status | evidence or readings |
 |---|---|---|---|---|
 
+## 3.2.0 Translation memory lookup
+
+Before step 1, look up the batch in translation memory and reuse earlier translations that fit. Run this after 3.1b — checking a draft needs the batch's `resolved` facts.
+
+**Call.** One `lookup_translation_memory` call per batch, chunked to ≤100 texts per call. Pass:
+- `texts` — the batch's source strings. When a string's speaker and addressee are known, pass it as `{ "text": "...", "speakerId": "...", "addresseeId": "..." }`; otherwise as a plain string.
+- `sourceLanguage` — the explicit source language, never `auto` (rows stored with `auto` don't match an explicit language, and the reverse).
+- `targetLanguage`.
+- `glossaryId` — `project.json`'s `glossary_id` (omit it when the project has no glossary).
+
+Each text comes back with `match: null` (a miss) or a match carrying `output`, `review`, `glossaryId`, `createdAt`, `translationType`, `contextNote`, `apiKey.name` and its id (`historyId`, or the revision id for an approved match).
+
+**Glossary filter.** Use an `unreviewed` match only when its `glossaryId` equals `project.json`'s `glossary_id` (both empty when the project has no glossary). Step 1's no-glossary throwaway translations are stored in translation history too — the filter keeps them out. Treat a match that fails the filter as a miss and log it as `rejected-glossary`.
+
+**Per match:**
+- `review: "approved"` — a human-approved translation for the same source, speaker and addressee. Check tags `<...>`, placeholders `{...}`, variables and numbers; if they're intact, write it in 3.3 as is. If they're not, treat it like a failed draft below.
+- `review: "unreviewed"` — a draft. Check it like a step-3 result (3.2): tags, placeholders, variables and numbers; speaker intent and addressee (singular/plural); register; the `resolved` facts from 3.1b. Unreviewed matches ignore speaker and context, so a match can come from a different speaker. Write it in 3.3 if it passes. If it doesn't, re-translate that string alone with `translate_text` (with `glossaryId`, no `fluency`) — a step-3 fix, not a new step 1/2.
+
+**Only misses go to 3.2.** A string with a TM match is never part of a `translate_batch`/`translate_batch_async` call — not in step 1, not in step 3.
+
+**Fluency for TM matches.** No step 1 or step 2: log `fluency: null` with `"fluency_skipped": "tm_hit"`. Step 4 (3.3b) runs on the written text when the setting includes it, like any other written string.
+
+**TM log.** Append one line per matched string to `tools/tm_hits.jsonl`:
+
+```json
+{"id": "<string/row id>", "file": "<path>", "sourceLang": "en", "targetLang": "de", "sourceText": "...", "review": "unreviewed", "historyId": "<id>", "revisionId": null, "glossaryId": "<id>", "createdAt": "...", "apiKey": "<name>", "action": "written", "reason": null}
+```
+
+`action` is `written` (used as is), `retranslated` (draft failed a check — `reason` says which) or `rejected-glossary` (failed the glossary filter, translated as a miss). Misses aren't logged here.
+
 ## 3.2 Translate and measure — per the fluency setting
 
-Every translation and every score comes from the `algebras` MCP server's tools — never generate translated text or a fluency score yourself. Which calls run per batch depends on `project.json`'s `fluency` (chosen in onboard 1.2d; never re-ask):
+Every translation and every score comes from the `algebras` MCP server's tools — never generate translated text or a fluency score yourself. Every row starts with 3.2.0's TM lookup; the steps below run on its misses only. Which calls run per batch depends on `project.json`'s `fluency` (chosen in onboard 1.2d; never re-ask):
 
 | `fluency` | Calls per batch, in order |
 |---|---|
-| `none` | Step 3 |
-| `isolated` | Step 1 → step 2 → step 3 |
-| `context` | Step 3 → step 4 (3.3b) |
-| `both` | Step 1 → step 2 → step 3 → step 4 (3.3b) |
+| `none` | TM lookup (3.2.0) → misses: step 3 |
+| `isolated` | TM lookup (3.2.0) → misses: step 1 → step 2 → step 3 |
+| `context` | TM lookup (3.2.0) → misses: step 3 → step 4 (3.3b); matches: step 4 |
+| `both` | TM lookup (3.2.0) → misses: step 1 → step 2 → step 3 → step 4 (3.3b); matches: step 4 |
 
 Each string is measured **at most once per mode** — once context-free (step 2), once context-aware (step 4) — and never again, even if it is revised later. Never pass `fluency: true` on a translate call; the inline flag is not part of this flow. Translate a cluster's glossary-term and `resolved` rows before its `open`/`conflict` rows, so step 4's neighbor windows have translated neighbors.
 
@@ -91,7 +121,7 @@ Each string is measured **at most once per mode** — once context-free (step 2)
 
 **Step 3 — final, with glossary (always).** Call `translate_batch`/`translate_text` (or `translate_batch_async` — see below) on the texts, **with** `glossaryId` set to `project.json`'s `glossary_id`, and without `fluency` — this call's output is what actually gets written in 3.3. Step 1's translation, if there was one, is discarded.
 
-Chunk every call to ≤20 texts (the cap on `translate_batch`/`translate_batch_async` and `check_fluency_batch`), with the same chunking across the steps. If the batch you declared in 3.1 is larger, sub-chunk it here without changing what counts as "the batch" for 3.4's consistency check.
+Chunk every translate and fluency call to ≤20 texts (the cap on `translate_batch`/`translate_batch_async` and `check_fluency_batch`), with the same chunking across the steps. If the batch you declared in 3.1 is larger, sub-chunk it here without changing what counts as "the batch" for 3.4's consistency check.
 
 Pick the tool per step, independently:
 - `translate_batch` vs `translate_batch_async` + poll `get_translate_batch_async_status` — `translate_batch` is the default, blocking until done; reach for the async form when dispatching several chunks (or several of these steps) concurrently and polling while you do other work is actually faster than waiting on each in turn. No fixed size threshold — use your judgment.
@@ -110,7 +140,11 @@ If the user answers a client question mid-run, update the matching lines in `con
 
 **Apply glossary terms exactly (step 3).** For source terms not yet in the glossary:
 1. Search the web for established translations before coining your own.
-2. If a reliable translation exists, create it immediately via `create_glossary_term` (see the `glossary` skill's 2.5 for the shape) rather than waiting until end of batch — later texts in this same session should get to use it too.
+2. If a reliable translation exists, don't create a glossary term mid-batch. Append it to the local candidate list `tools/glossary_candidates.jsonl` (one line per term and language; add the string id to `string_ids` if the line exists), and pass it in `contexts` for later strings in the session so they render it the same way. A candidate is a consistency hint, never a lock. 3.5 pushes the list once, after all batches.
+
+   ```json
+   {"term": "Flight Dart", "translation": "Flugpfeil", "sourceLang": "en", "targetLang": "de", "evidence": "<quoted line>", "source_url": "https://...", "string_ids": ["12", "40"], "status": "local", "termId": null}
+   ```
 3. If you're unsure, flag the term and ask the user before translating.
 
 The API returns translated text; it doesn't know your project's markup conventions unless you tell it. After step 3's response, verify yourself: all tags `<...>`, placeholders `{...}`, variables, numbers, and markup preserved exactly; speaker intent, addressee (singular/plural), register, and intensity matched; `resolved` facts honored. Use `prompt` on the translate call to steer this (e.g. "preserve all `{placeholder}` tokens exactly") when a chunk needs it, and re-translate (`translate_text`, with `glossaryId` and no `fluency`) any result that got it wrong rather than hand-editing the API's output yourself — this is a step-3 fix, not a new step 1/2.
@@ -199,14 +233,40 @@ This applies three checks — full method descriptions are in the `qa` skill's 4
 
 - **Method A** (exact-duplicate source, zero heuristics): the batch's source strings that also occur elsewhere in the corpus must have the same target rendering everywhere.
 - **Method B** (term-embedding, heuristic): terms with an established canonical rendering elsewhere in the corpus must be rendered consistently when embedded inside this batch's sentences.
-- **Glossary compliance** (via `count_glossary_terms`): for each segment in the batch, call `count_glossary_terms` with `project.json`'s `glossary_id`, passing `sourceLanguage`, `sourceText`, `targetLanguage`, and `targetText`. A term found in the source but missing from the target (i.e. `sourceCount > 0` but `targetCount == 0` in the per-term `terms` array) is a glossary compliance violation. Log these alongside Method A/B findings.
+- **Glossary compliance** (via `count_glossary_terms`): for each segment in the batch, call `count_glossary_terms` with `project.json`'s `glossary_id`, passing `sourceLanguage`, `sourceText`, `targetLanguage`, and `targetText`. A term found in the source but missing from the target (i.e. `sourceCount > 0` but `targetCount == 0` in the per-term `terms` array) is a glossary MISS. Save each segment's result as its `before` record in `tools/glossary_pass.jsonl` (shape in 3.5), and log each MISS in `tools/consistency_findings.jsonl` with status `deferred-3.5`. Don't fix glossary MISSes here — 3.5 fixes them all in one pass.
 
 **Review every finding before dismissing or accepting it** — the script raises signals, not verdicts. For each one, read the actual source/target context and append one line to `tools/consistency_findings.jsonl`:
 - `confirmed` (status stays `open`) if it's a real inconsistency, or
 - `false_positive` with a short reason if it isn't (e.g. a different part of speech, a deliberate valid variant, a polysemous homograph).
 
-**This is a soft gate**: do not block starting the next batch on a confirmed finding. Leave it `open` in the findings log so the `qa` skill's full pass (4.2) has a ready-made map of everything flagged along the way, rather than fixing drift ad hoc mid-flow or losing track of it. Exception: if the fix is trivial and unambiguous (apply the already-established canonical rendering, no judgment call involved), you may fix it immediately and mark it `fixed-inline` in the same log instead of leaving it open.
+**This is a soft gate**: do not block starting the next batch on a confirmed finding. Leave it `open` in the findings log so the `qa` skill's full pass (4.2) has a ready-made map of everything flagged along the way, rather than fixing drift ad hoc mid-flow or losing track of it. Exception (Method A/B only, never a glossary MISS): if the fix is trivial and unambiguous (apply the already-established canonical rendering, no judgment call involved), you may fix it immediately and mark it `fixed-inline` in the same log instead of leaving it open.
+
+## 3.5 Final glossary pass
+
+Run once, after the last batch of the session (3.1–3.4 done for every batch), before QA. It fixes glossary MISSes in one pass and measures glossary compliance before and after.
+
+**Scope.** Every string written this session, per target language — translated strings and TM matches. Existing translations kept from onboard 1.2c are out of scope.
+
+**Pass log.** One line per string in `tools/glossary_pass.jsonl`, updated in place rather than appended twice:
+
+```json
+{"id": "<string/row id>", "file": "<path>", "targetLang": "de", "before": {"terms": [{"term": "Flight Dart", "sourceCount": 1, "targetCount": 0}], "miss": ["Flight Dart"]}, "status": "fixed", "after": {"terms": [{"term": "Flight Dart", "sourceCount": 1, "targetCount": 1}], "miss": []}, "reason": null}
+```
+
+`status`: `ok` (no MISS), `miss` (not fixed yet), `fixed`, `accepted` (a false positive — `reason` says why), `user` (waiting on or decided by the user). The pass is resumable: skip strings whose `status` is `ok`, `fixed`, `accepted` or `user`, and continue from the rest.
+
+1. **Before.** For each string in scope without a `before` record (3.4 already recorded most of them), call `count_glossary_terms` with `project.json`'s `glossary_id`, `sourceLanguage`, `sourceText`, `targetLanguage` and `targetText`. A MISS is `sourceCount > 0` and `targetCount == 0` for a term in the `terms` array.
+2. **Fix each MISS.** Re-translate the string with `translate_text`, with `glossaryId` and without `fluency`, and a `prompt` naming the approved forms of the missing terms. Verify tags, placeholders, numbers and `resolved` facts as in 3.2, write it with the parser (3.3), then call `count_glossary_terms` again and record `after` and `status`. Strings with the same source text are fixed together so Method A stays consistent. Don't re-score fluency: set `"revised_after_scoring": true` on the string's `tools/fluency_scores.jsonl` line.
+   - A string written from an `approved` TM match is never overwritten — set `status: "user"` and list it for the user.
+   - If a fixed string still misses the term, read it: an inflection, word order or homograph the counter didn't recognize is `accepted` with a reason; anything else goes to the user.
+3. **Compliance.** Per target language, before and after the fixes: strings with at least one glossary term in the source, strings with a MISS, the share of strings without a MISS (%), and term occurrences found in the target out of those in the source (count and %). Write it to `tools/glossary_compliance.json` and show it as a table:
+
+   | lang | strings with terms | MISS before | compliant before | MISS after | compliant after | term occurrences before | term occurrences after |
+   |---|---|---|---|---|---|---|---|
+
+   Until the platform counts approved terms only (T2), these numbers include unapproved glossary terms — report them as they are.
+4. **Push candidates once.** Show the `status: "local"` lines of `tools/glossary_candidates.jsonl` as a table (term, translation, language, evidence, strings). Push the rows the user accepts with `create_glossary_term` and `status: "candidate"` (see the `glossary` skill's 2.5 for the term shape), and mark each line `pushed` with the returned `termId`; mark rejected rows `rejected`. **This step requires the platform to support candidate status on `create_glossary_term` (T2).** If the tool has no `status` parameter, don't push — the list stays local, it is the source of truth for candidates, and tell the user it's waiting there.
 
 ## Next
 
-Once translation is complete for the requested scope (all batches for this session translated and consistency-checked), continue with Phase 4 — invoke the `qa` skill (`algebras-agent:qa`) if skill invocation is available in this session, otherwise open and follow `skills/qa/SKILL.md` in full. To translate another batch, repeat from 3.1.
+Repeat 3.1–3.4 for each batch. Once translation is complete for the requested scope (all batches for this session translated and consistency-checked), run 3.5 once, then continue with Phase 4 — invoke the `qa` skill (`algebras-agent:qa`) if skill invocation is available in this session, otherwise open and follow `skills/qa/SKILL.md` in full. To translate another batch later, repeat from 3.1 and run 3.5 again — its log covers only strings not yet passed.

@@ -39,7 +39,7 @@ Optional check that the key works: `GET https://platform.algebras.ai/api/v1/me` 
 
 ## Step 2 — Connect the Algebras MCP server
 
-The whole workflow runs through the `algebras` MCP server's tools (`translate_batch`, `check_fluency_batch`, `create_glossary`, `list_glossary_terms`, `count_glossary_terms`, ...). **Never generate translations yourself instead of calling them.**
+The whole workflow runs through the `algebras` MCP server's tools (`translate_batch`, `check_fluency_batch`, `create_glossary`, `list_glossary_terms`, `count_glossary_terms`, `lookup_translation_memory`, ...). **Never generate translations yourself instead of calling them.**
 
 If the `algebras` tools are already available in this session (e.g. you can call `list_glossaries`), skip to Step 3.
 
@@ -159,7 +159,7 @@ In a git repository, the translated files land on their own branch — `algebras
 Describe these to the user accurately:
 
 - **Glossary** — extracted from code and UI strings, checked against established translations, confirmed by the user, and stored on the Algebras platform.
-- **Translation memory** — translations already in the repo are kept and reused as the reference for terminology and style. They're never sent for translation again.
+- **Translation memory** — translations already in the repo are kept and reused as the reference for terminology and style. They're never sent for translation again. Earlier translations made through Algebras with the project's glossary are looked up with `lookup_translation_memory` before each batch and reused; only misses are translated.
 - **Context files** — specs, docs, lore and style guides found in the repo, classified by the sections in `CONTEXT_REQUIREMENTS.md` and read before glossary extraction and each translation batch.
 - **Context facts** — who speaks, to whom, formal or informal, what a placeholder means: recorded in `context_pack.json` and `context_facts.jsonl` only from a cited source. Open points go to `client_questions.md`; missing context never blocks translation.
 - **Screenshots** — screenshots already in the repo are linked to strings and used as context. Automatic screenshot capture isn't available yet.

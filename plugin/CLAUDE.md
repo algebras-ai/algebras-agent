@@ -43,6 +43,7 @@ In a git repository, the work lands on its own branch (`algebras/localize-<YYYYM
 ### Glossary
 
 - Glossaries live on the Algebras platform, not as local files. Create, read, update, and delete terms through the `algebras` MCP server's glossary tools (`create_glossary_term`, `list_glossary_terms`, `update_glossary_term`, `delete_glossary_term`, `count_glossary_terms`, etc.), and keep the working glossary's id in `project.json`'s `glossary_id`.
+- Before translating a batch, reuse earlier translations through the `algebras` MCP server's `lookup_translation_memory` (the `translate` skill's 3.2.0): only matches made with the project's glossary are used, and only misses are translated. New terms found while translating go to a local candidate list, and glossary misses are fixed in one final pass after all batches (3.5).
 - Add valid inflected forms as their own term definitions when QA flags a correct translation.
 - Never rebuild the glossary from scratch unless the user explicitly asks — update or delete individual terms instead.
 - Optional deduplication across all glossary terms is available once a glossary exists — always ask the user first, never run automatically. See the `translate` skill's pre-batch step, or invoke the `glossary-dedupe` skill (`algebras-agent:glossary-dedupe`) directly at any time.
