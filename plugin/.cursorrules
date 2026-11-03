@@ -44,7 +44,7 @@ In a git repository, the work lands on its own branch (`algebras/localize-<YYYYM
 
 - Glossaries live on the Algebras platform, not as local files. Create, read, update, and delete terms through the `algebras` MCP server's glossary tools (`create_glossary_term`, `list_glossary_terms`, `update_glossary_term`, `delete_glossary_term`, `count_glossary_terms`, etc.), and keep the working glossary's id in `project.json`'s `glossary_id`.
 - Before translating a batch, reuse earlier translations through the `algebras` MCP server's `lookup_translation_memory` (the `translate` skill's 3.2.0): only matches made with the project's glossary are used, and only misses are translated. New terms found while translating go to a local candidate list, and glossary misses are fixed in one final pass after all batches (3.5).
-- Terms the agent creates are candidates (`status: "candidate"`). Only a person approves a term, in the platform UI; translation prompts and the glossary counter use approved terms only, and only approved terms are locks.
+- New terms are candidates, and editing an approved term's texts, gender or variants makes it a candidate again. Approve a term with `set_glossary_term_status` only after the user approves it in a table in chat (the `glossary` skill's 2.6). Translation prompts and the glossary counter use approved terms only, and only approved terms are locks.
 - Record grammatical gender in a definition's `gender` and other approved forms in its `variants`.
 - Add valid inflected forms as their own term definitions when QA flags a correct translation.
 - Never rebuild the glossary from scratch unless the user explicitly asks — update or delete individual terms instead.

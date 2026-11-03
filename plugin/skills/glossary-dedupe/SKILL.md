@@ -1,7 +1,7 @@
 ---
 name: glossary-dedupe
 description: Optional glossary maintenance — fetches every term from the glossary's Algebras platform record and checks for exact duplicates, near-duplicate variants, and conflicting canonical translations. Always confirm with the user before running. Usable standalone at any point once a glossary exists, and referenced from the translate skill before the first batch of a session.
-allowed-tools: [Read, Write, Edit, Glob, Grep, mcp__algebras__list_glossary_terms, mcp__algebras__update_glossary_term, mcp__algebras__delete_glossary_term]
+allowed-tools: [Read, Write, Edit, Glob, Grep, mcp__algebras__list_glossary_terms, mcp__algebras__update_glossary_term, mcp__algebras__set_glossary_term_status, mcp__algebras__delete_glossary_term]
 ---
 
 # Glossary Deduplication (optional maintenance)
@@ -50,7 +50,7 @@ Apply only user-approved merges. For any conflict resolution, record the decisio
 
 ## D.4 Apply merges via the API
 
-For each approved merge: call `update_glossary_term` on the surviving `GlossaryTerm` with the union of both entries' `definitions` (the approved rendering per language, its `gender`, and the union of both entries' `variants`) and the `type` the user chose, then `delete_glossary_term` on the redundant entry. The surviving term keeps its `status`; if the redundant entry was approved and the survivor is a candidate, tell the user to approve the survivor in the platform UI. There is no separate re-validation step — re-run `list_glossary_terms` afterward if you want to confirm the merge landed.
+For each approved merge: call `update_glossary_term` on the surviving `GlossaryTerm` with the union of both entries' `definitions` (the approved rendering per language, its `gender`, and the union of both entries' `variants`) and the `type` the user chose, then `delete_glossary_term` on the redundant entry. Changing the definitions moves an approved survivor back to `candidate`. If either entry was approved, ask the user whether to approve the merged term, and if they agree, call `set_glossary_term_status` with `status: "approved"`. There is no separate re-validation step — re-run `list_glossary_terms` afterward if you want to confirm the merge landed.
 
 ## Next
 

@@ -138,7 +138,7 @@ Tags record how a string was handled under an unresolved point. They are never e
 |---|---|
 | `agent-choice` | The agent picked a reading for an `open` point because the wording had to commit. The reason is a guess. |
 | `provisional` | Wording written under a `conflict`. One document note explains the conflict. |
-| `glossary-candidate` | A repeating label or formula with no approved glossary card yet: no card, or a card with `status: "candidate"`. It becomes a lock only after a person approves the card in the platform UI. |
+| `glossary-candidate` | A repeating label or formula with no approved glossary card yet: no card, or a card with `status: "candidate"`. It becomes a lock only after the user approves the card (the `glossary` skill's 2.6, or the platform UI). |
 
 An `agent-choice` reading is written to the platform as a `suggestion` without a source, so nobody reads it as decided; a `provisional` string stays `flagged`. The tags themselves are kept in the translate phase's fluency log (`tools/fluency_scores.jsonl`, `tags`).
 

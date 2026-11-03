@@ -1,7 +1,7 @@
 ---
 name: glossary
 description: Phase 2 of the Algebras translation workflow (Glossary Bootstrap) — extract candidate terms, research established translations, and create a validated glossary on the Algebras platform. Requires a completed project.json from the onboard phase.
-allowed-tools: [Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__list_glossaries, mcp__algebras__create_glossary, mcp__algebras__get_glossary, mcp__algebras__create_glossary_term, mcp__algebras__bulk_create_glossary_terms, mcp__algebras__list_glossary_terms, mcp__algebras__list_glossary_term_types, mcp__algebras__create_glossary_term_type]
+allowed-tools: [Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__list_glossaries, mcp__algebras__create_glossary, mcp__algebras__get_glossary, mcp__algebras__create_glossary_term, mcp__algebras__bulk_create_glossary_terms, mcp__algebras__list_glossary_terms, mcp__algebras__list_glossary_term_types, mcp__algebras__create_glossary_term_type, mcp__algebras__set_glossary_term_status]
 ---
 
 # Phase 2 — Glossary Bootstrap
@@ -30,7 +30,7 @@ Then call `list_glossary_term_types` once and keep the keys it returns: the buil
 
 ## 2.1b Import the client's glossary
 
-Before extracting new candidates, check `project.json`'s `context_files.glossary`. If it lists client glossary files, read them and propose their terms for import — in the same confirmation table as 2.4, before any candidates extracted from source strings. Never import silently, and don't call `bulk_create_glossary_terms` until the user accepts the rows; accepted rows go through 2.5, skipped rows are not created. Skip terms the platform glossary already has.
+Before extracting new candidates, check `project.json`'s `context_files.glossary`. If it lists client glossary files, read them and propose their terms for import — in the same confirmation table as 2.4, before any candidates extracted from source strings. Never import silently, and don't call `bulk_create_glossary_terms` until the user accepts the rows; accepted rows go through 2.5, skipped rows are not created. Skip terms the platform glossary already has — check each with `list_glossary_terms` and `search` (a case-insensitive substring of a term or definition, in any language).
 
 Map each client term onto the term shape in 2.5:
 - The client's type or category → the term's `type`, one of the keys from 2.1. A client category with no matching key is a proposed new type (2.1), or `other`.
@@ -79,9 +79,8 @@ Show the grammatical gender for each rendering in a gendered language, and the v
 
 ## 2.5 Create the terms
 
-Each accepted row becomes one glossary term:
+Each accepted row becomes one glossary term. A new term starts as a `candidate`; 2.6 approves it.
 - `type` — the type key from 2.4.
-- `status` — always `"candidate"`. A term's status covers all its languages. Only a person in the platform UI can approve a term; an API key that sends `"approved"` gets `"candidate"` and a note in the response.
 - `definitions[]` — one entry per language you have a confirmed rendering for: `language` (code), `term` (the rendering in that language), `definition` (a short, language-neutral gloss of what the term means; reuse the same definition text across languages unless the meaning itself shifts), `gender` for a language with grammatical gender, and `variants` for its other approved forms.
 
 For the row above:
@@ -89,7 +88,6 @@ For the row above:
 ```json
 {
   "type": "item",
-  "status": "candidate",
   "definitions": [
     { "language": "en", "term": "Dragon Stone", "definition": "Rare magical artifact" },
     { "language": "de", "term": "Drachenstein", "definition": "Rare magical artifact", "gender": "masculine" },
@@ -99,16 +97,27 @@ For the row above:
 }
 ```
 
-Push all accepted rows from this session in one `bulk_create_glossary_terms` call against `project.json`'s `glossary_id` (falls back to one `create_glossary_term` call per row if you're only adding a single term mid-translation — see the `translate` skill's 3.2). Check the response for partial failures (bulk create returns `successful`/`failed` when not everything lands) and surface any failures to the user rather than silently dropping them. There is no separate validation step — the platform enforces the schema on write and rejects a `type` key the organization doesn't have.
+Push all accepted rows from this session in one `bulk_create_glossary_terms` call against `project.json`'s `glossary_id` (falls back to one `create_glossary_term` call per row if you're only adding a single term mid-translation — see the `translate` skill's 3.2). Check the response for partial failures (bulk create returns `successful`/`failed` when not everything lands) and surface any failures to the user rather than silently dropping them. There is no separate validation step — the platform enforces the schema on write. An unknown `type` key fails the whole bulk call, so use only keys from 2.1 and types created there.
 
 ## 2.6 Approve the terms
 
-Terms created through the MCP tools are candidates. Translation prompts and the glossary counter (`count_glossary_terms`) use approved terms only, and only a person can approve a term, on the glossary's page in the Algebras platform UI. Tell the user:
+New terms are candidates. Translation prompts and the glossary counter (`count_glossary_terms`) use approved terms only, so a term counts once it is approved. A term's status covers all its languages: `candidate`, `approved` or `not_a_term`.
 
-> The `<N>` terms are in glossary `<name>` as candidates. Approve them on the glossary page in the Algebras platform; until then translation doesn't apply them and the glossary check doesn't count them. Reply when you're done, or say "continue" to translate with them as unapproved hints.
+Call `list_glossary_terms` with `status: "candidate"` — this covers the terms just created and candidates left from earlier sessions or from translate 3.5 — and show them as a table:
 
-When the user replies, call `list_glossary_terms` with `status: "candidate"` and report how many terms are approved and how many are still candidates. Candidates left at this point are `glossary-candidate`s in translate: consistency hints, never locks.
+> | # | Source term | Type | [de] | [fr] | Created |
+> |---|---|---|---|---|---|
+> | 1 | Dragon Stone | item | Drachenstein (m.) | Pierre du Dragon (f.); also: Pierre de Dragon | this session |
+> | 2 | Flight Dart | mechanic | Flugpfeil (m.) | Fléchette de vol (f.) | translate 3.5 |
+>
+> **Actions**: Approve all / Approve rows (list the numbers) / Mark a row not a term / Keep as candidate
+
+Never approve a term the user hasn't approved in this table, and don't offer a low-confidence term until it's resolved. For each row the user approves, call `set_glossary_term_status` with `glossaryId`, the term's `termId` and `status: "approved"`; for a row they reject, `status: "not_a_term"`. The platform records the approval against the API key. The user can also approve terms on the glossary page in the Algebras platform UI.
+
+Editing an approved term's texts, gender or variants with `update_glossary_term` (e.g. adding a variant or an inflected form) moves it back to `candidate`; changing only its `type` doesn't. After the user confirms the edit, approve it again with `set_glossary_term_status`.
+
+Report how many terms are approved and how many are still candidates. Candidates left at this point are `glossary-candidate`s in translate: consistency hints, never locks.
 
 ## Next
 
-Once accepted terms are created, every low-confidence term has been resolved with the user, and the user has approved the terms or chosen to continue with candidates (2.6), continue with Phase 3 — invoke the `translate` skill (`algebras-agent:translate`) if skill invocation is available in this session, otherwise open and follow `skills/translate/SKILL.md` in full.
+Once accepted terms are created, every low-confidence term has been resolved with the user, and the user has decided which candidates to approve (2.6), continue with Phase 3 — invoke the `translate` skill (`algebras-agent:translate`) if skill invocation is available in this session, otherwise open and follow `skills/translate/SKILL.md` in full.

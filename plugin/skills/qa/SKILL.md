@@ -122,7 +122,7 @@ After each batch:
 - Row range and languages processed
 - QA findings by type and count
 - Consistency QA: Method A / Method B / glossary-anchored findings — confirmed, false-positive, fixed-inline, and still-open counts
-- Glossary compliance per target language, before and after the `translate` skill's 3.5 (counts and %, from `tools/glossary_compliance.json`), strings still missing a term (`accepted` or `user` in `tools/glossary_pass.jsonl`), glossary candidates pushed or kept local (`tools/glossary_candidates.jsonl`), and glossary terms still `candidate` on the platform (`list_glossary_terms` with `status: "candidate"`) — they wait for approval in the platform UI
+- Glossary compliance per target language, before and after the `translate` skill's 3.5 (counts and %, from `tools/glossary_compliance.json`), strings still missing a term (`accepted` or `user` in `tools/glossary_pass.jsonl`), glossary candidates pushed or kept local (`tools/glossary_candidates.jsonl`), and glossary terms still `candidate` on the platform (`list_glossary_terms` with `status: "candidate"`) — offer the `glossary` skill's 2.6 approval table for them
 - Translation memory reuse per target language, from `tools/tm_hits.jsonl`: approved matches written, unreviewed matches written, re-translated, and rejected by the glossary filter
 - Fluency self-check, per the project's `fluency` setting:
   - `none`: "not measured (project setting)"
