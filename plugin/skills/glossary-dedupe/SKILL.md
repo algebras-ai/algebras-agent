@@ -28,7 +28,8 @@ Call `list_glossary_terms` against `project.json`'s `glossary_id`, paging throug
 
 For a small glossary, reason over the fetched list directly. For a large one, generate `tools/dedupe_glossary.<ext>` that takes the JSON dump from D.1 as input (not a local glossary file — none exists) and detects, per language:
 - **Exact duplicates** — two different `GlossaryTerm` entries whose `term` (case/whitespace-normalized) is identical for the same language.
-- **Near-duplicates** — case, diacritic, whitespace, or singular/plural variants of what is likely the same underlying term.
+- **Near-duplicates** — case, diacritic, whitespace, or singular/plural variants of what is likely the same underlying term, and an entry whose `variants[].term` matches another entry's `term` for the same language.
+- **Type conflicts** — near-duplicate or duplicate entries with different `type` keys.
 - **Conflicting canonical translations** — the same or near-duplicate source-language term whose linked entries render a different target-language `term` for the same target language.
 
 Test it on a small sample before running it over the full fetched list.
@@ -49,7 +50,7 @@ Apply only user-approved merges. For any conflict resolution, record the decisio
 
 ## D.4 Apply merges via the API
 
-For each approved merge: call `update_glossary_term` on the surviving `GlossaryTerm` with the union of both entries' `definitions` (the approved rendering per language), then `delete_glossary_term` on the redundant entry. There is no separate re-validation step — re-run `list_glossary_terms` afterward if you want to confirm the merge landed.
+For each approved merge: call `update_glossary_term` on the surviving `GlossaryTerm` with the union of both entries' `definitions` (the approved rendering per language, its `gender`, and the union of both entries' `variants`) and the `type` the user chose, then `delete_glossary_term` on the redundant entry. The surviving term keeps its `status`; if the redundant entry was approved and the survivor is a candidate, tell the user to approve the survivor in the platform UI. There is no separate re-validation step — re-run `list_glossary_terms` afterward if you want to confirm the merge landed.
 
 ## Next
 

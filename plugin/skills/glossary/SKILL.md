@@ -1,7 +1,7 @@
 ---
 name: glossary
 description: Phase 2 of the Algebras translation workflow (Glossary Bootstrap) — extract candidate terms, research established translations, and create a validated glossary on the Algebras platform. Requires a completed project.json from the onboard phase.
-allowed-tools: [Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__list_glossaries, mcp__algebras__create_glossary, mcp__algebras__get_glossary, mcp__algebras__create_glossary_term, mcp__algebras__bulk_create_glossary_terms]
+allowed-tools: [Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__list_glossaries, mcp__algebras__create_glossary, mcp__algebras__get_glossary, mcp__algebras__create_glossary_term, mcp__algebras__bulk_create_glossary_terms, mcp__algebras__list_glossary_terms, mcp__algebras__list_glossary_term_types, mcp__algebras__create_glossary_term_type]
 ---
 
 # Phase 2 — Glossary Bootstrap
@@ -26,13 +26,17 @@ If `glossary_id` is `null`:
 
 Report the result: "Glossary `<name>` (`<id>`) — `<N>` existing terms" (or "0 — empty, ready for bootstrapping").
 
+Then call `list_glossary_term_types` once and keep the keys it returns: the built-in types (`character`, `item`, `location`, `mechanic`, `ui_label`, `other`) plus the organization's own. Every term gets one of these keys as its `type`. Only built-in keys change how a term is handled (a `character` needs a gender in each gendered target language); the organization's own types are labels for grouping and filtering. If the project's terms need a category none of the keys fits, propose a new type in the 2.4 table — a lowercase snake_case `key` and a `name` — and create it with `create_glossary_term_type` only after the user accepts it; otherwise use `other`.
+
 ## 2.1b Import the client's glossary
 
 Before extracting new candidates, check `project.json`'s `context_files.glossary`. If it lists client glossary files, read them and propose their terms for import — in the same confirmation table as 2.4, before any candidates extracted from source strings. Never import silently, and don't call `bulk_create_glossary_terms` until the user accepts the rows; accepted rows go through 2.5, skipped rows are not created. Skip terms the platform glossary already has.
 
-Map each client term's type, definition, translation and grammatical gender onto the `definitions[]` shape. The platform has no separate gender or variant field, so:
-- Record grammatical gender inside the definition text (e.g. "Rare magical artifact; de: masculine").
-- Client glossaries often mark inflection and variants: `stem|ending` (no spaces around `|`) is an inflection stem — store the full form as the term; `variant | variant` (spaces around `|`) or a second target column is a second approved form — store the first as the term and note "also approved: <second>" in the definition; `*` is a prefix wildcard — store the base form. Keep these notes, because the local term matching in translate (step 4) reads them.
+Map each client term onto the term shape in 2.5:
+- The client's type or category → the term's `type`, one of the keys from 2.1. A client category with no matching key is a proposed new type (2.1), or `other`.
+- Definition and translation → each language's `definition` and `term`.
+- Grammatical gender → that language's `gender` (`masculine`, `feminine`, `neuter`, `common` or `none`).
+- Client glossaries often mark inflection and variants: `stem|ending` (no spaces around `|`) is an inflection stem — store the full form as the term; `variant | variant` (spaces around `|`), a second target column or a gendered form (e.g. a feminine form of a title) is a second approved form — store the first as the `term` and the others in that language's `variants` as `{ "gender": ..., "term": ... }` (`gender: "none"` for a form that isn't gendered, such as a synonym); `*` is a prefix wildcard — store the base form. The local term matching in translate (step 4) reads `variants`.
 
 Then continue with 2.2 for terms that are still missing.
 
@@ -55,38 +59,56 @@ For each candidate term, use web search to find whether an official or widely-us
 
 - Search: `"<term>" translation <target language>` and `"<term>" <target language> official localization`
 - Prefer: publisher/vendor official localizations (for `fintech`: the client's existing legal translations, then the regulator's published glossary) → widely-adopted community translations → professional dictionaries
-- If multiple translations coexist, pick the most authoritative one as the rendering you'll propose — there's no separate "variants" slot in the platform's glossary schema, so don't try to record alternatives alongside it.
+- If multiple translations coexist, pick the most authoritative one as the rendering you'll propose. An alternative that is also correct (an established synonym, or a gendered form) goes into that language's `variants`; one that is merely in use doesn't.
 - If a translation is known to be misleading or actively wrong, don't create a term for it at all — the glossary only stores what to use, not what to avoid. Note the risk for the `translate` skill to watch for manually instead (there is no `forbidden` concept on the platform).
 
 ## 2.4 Confirm with user
 
 Present your proposals before creating anything. For terms where you're uncertain (confidence = low), flag them explicitly:
 
-> | # | Source term | Definition | [de] | [fr] | Confidence |
-> |---|---|---|---|---|---|
-> | 1 | Dragon Stone | Rare magical artifact | Drachenstein | Pierre du Dragon | high |
-> | 2 | Blink | Teleport dash ability | Blinken? | ? | low — please advise |
+> | # | Source term | Type | Definition | [de] | [fr] | Confidence |
+> |---|---|---|---|---|---|---|
+> | 1 | Dragon Stone | item | Rare magical artifact | Drachenstein (m.) | Pierre du Dragon (f.); also: Pierre de Dragon | high |
+> | 2 | Blink | mechanic | Teleport dash ability | Blinken? | ? | low — please advise |
+>
+> New type proposed: `spell` — "Spell" (rows 4, 9). Accept / use `other` instead
 >
 > **Actions**: Accept all / Edit a row (reply with row number + correction) / Skip a term / Add a term
 
-Do not create a glossary term until the user accepts it. Terms with low confidence must be resolved before translation starts. If the user rejects a suggestion, record the correct form and the reason.
+Show the grammatical gender for each rendering in a gendered language, and the variants after it. A `character` term whose gender is unknown in a gendered target language has low confidence. Do not create a glossary term until the user accepts it. Terms with low confidence must be resolved before translation starts. If the user rejects a suggestion, record the correct form and the reason.
 
 ## 2.5 Create the terms
 
-Each accepted row becomes one glossary term with one `definitions[]` entry per language you have a confirmed rendering for — `language` (code), `term` (the rendering in that language), `definition` (a short, language-neutral gloss of what the term means; reuse the same definition text across languages unless the meaning itself shifts). For the row above:
+Each accepted row becomes one glossary term:
+- `type` — the type key from 2.4.
+- `status` — always `"candidate"`. A term's status covers all its languages. Only a person in the platform UI can approve a term; an API key that sends `"approved"` gets `"candidate"` and a note in the response.
+- `definitions[]` — one entry per language you have a confirmed rendering for: `language` (code), `term` (the rendering in that language), `definition` (a short, language-neutral gloss of what the term means; reuse the same definition text across languages unless the meaning itself shifts), `gender` for a language with grammatical gender, and `variants` for its other approved forms.
+
+For the row above:
 
 ```json
 {
+  "type": "item",
+  "status": "candidate",
   "definitions": [
     { "language": "en", "term": "Dragon Stone", "definition": "Rare magical artifact" },
-    { "language": "de", "term": "Drachenstein", "definition": "Rare magical artifact" },
-    { "language": "fr", "term": "Pierre du Dragon", "definition": "Rare magical artifact" }
+    { "language": "de", "term": "Drachenstein", "definition": "Rare magical artifact", "gender": "masculine" },
+    { "language": "fr", "term": "Pierre du Dragon", "definition": "Rare magical artifact", "gender": "feminine",
+      "variants": [{ "gender": "feminine", "term": "Pierre de Dragon" }] }
   ]
 }
 ```
 
-Push all accepted rows from this session in one `bulk_create_glossary_terms` call against `project.json`'s `glossary_id` (falls back to one `create_glossary_term` call per row if you're only adding a single term mid-translation — see the `translate` skill's 3.2). Check the response for partial failures (bulk create returns `successful`/`failed` when not everything lands) and surface any failures to the user rather than silently dropping them. There is no separate validation step — the platform enforces the schema on write.
+Push all accepted rows from this session in one `bulk_create_glossary_terms` call against `project.json`'s `glossary_id` (falls back to one `create_glossary_term` call per row if you're only adding a single term mid-translation — see the `translate` skill's 3.2). Check the response for partial failures (bulk create returns `successful`/`failed` when not everything lands) and surface any failures to the user rather than silently dropping them. There is no separate validation step — the platform enforces the schema on write and rejects a `type` key the organization doesn't have.
+
+## 2.6 Approve the terms
+
+Terms created through the MCP tools are candidates. Translation prompts and the glossary counter (`count_glossary_terms`) use approved terms only, and only a person can approve a term, on the glossary's page in the Algebras platform UI. Tell the user:
+
+> The `<N>` terms are in glossary `<name>` as candidates. Approve them on the glossary page in the Algebras platform; until then translation doesn't apply them and the glossary check doesn't count them. Reply when you're done, or say "continue" to translate with them as unapproved hints.
+
+When the user replies, call `list_glossary_terms` with `status: "candidate"` and report how many terms are approved and how many are still candidates. Candidates left at this point are `glossary-candidate`s in translate: consistency hints, never locks.
 
 ## Next
 
-Once accepted terms are created and every low-confidence term has been resolved with the user, continue with Phase 3 — invoke the `translate` skill (`algebras-agent:translate`) if skill invocation is available in this session, otherwise open and follow `skills/translate/SKILL.md` in full.
+Once accepted terms are created, every low-confidence term has been resolved with the user, and the user has approved the terms or chosen to continue with candidates (2.6), continue with Phase 3 — invoke the `translate` skill (`algebras-agent:translate`) if skill invocation is available in this session, otherwise open and follow `skills/translate/SKILL.md` in full.

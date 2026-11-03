@@ -24,7 +24,7 @@ An `invalid` result means the payload broke the schema: fix it and retry, or rep
 
 | Section | What it holds | How the agent uses it | Needed for |
 |---|---|---|---|
-| Glossary | Terms with type, definition, translation, and grammatical gender per language | Imported into the platform glossary in the glossary phase; enforced in QA | All projects |
+| Glossary | Terms with type, definition, translation, grammatical gender and variants per language | Imported into the platform glossary in the glossary phase; enforced in QA | All projects |
 | History & decisions | Past decisions, notes, open questions | Prevents re-asking settled questions; open questions feed the client list | Optional |
 | Universe | Setting, era, lore, product description | Sent as context with translation requests | Games, marketing |
 | Tone of voice | Style guide per language, short brief, formality matrix by speaker and listener | Steers register; the matrix resolves tu/vous and speech levels | Games, marketing, UI |
@@ -138,11 +138,11 @@ Tags record how a string was handled under an unresolved point. They are never e
 |---|---|
 | `agent-choice` | The agent picked a reading for an `open` point because the wording had to commit. The reason is a guess. |
 | `provisional` | Wording written under a `conflict`. One document note explains the conflict. |
-| `glossary-candidate` | A repeating label or formula with no approved glossary card yet. It becomes a lock only after a person adds the card. |
+| `glossary-candidate` | A repeating label or formula with no approved glossary card yet: no card, or a card with `status: "candidate"`. It becomes a lock only after a person approves the card in the platform UI. |
 
 An `agent-choice` reading is written to the platform as a `suggestion` without a source, so nobody reads it as decided; a `provisional` string stays `flagged`. The tags themselves are kept in the translate phase's fluency log (`tools/fluency_scores.jsonl`, `tags`).
 
-Glossary term status is counted locally, never by a model: `HIT` (an existing card's approved form is in the target; that span is a lock), `MISS` (approved form absent), `UNSURE` (a homograph in a segment that is not term-only; no lock). A segment whose source is only existing glossary spans is **term-only**.
+Glossary term status is counted locally, never by a model: `HIT` (an approved card's form — its `term` or one of its `variants` — is in the target; that span is a lock), `MISS` (approved form absent), `UNSURE` (a homograph in a segment that is not term-only; no lock). A segment whose source is only existing glossary spans is **term-only**.
 
 ## Authority order
 

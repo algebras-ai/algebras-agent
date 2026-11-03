@@ -62,7 +62,8 @@ Only send segments that don't have a translation yet. Segments that are already 
 Before translating, find what the batch's strings leave undecided — the points where the target language forces a choice the source doesn't make. Work per cluster (strings that share a speaker pair, a screen, a glossary entry or a template), one answer per cluster or per file, not per token. Fact statuses, tags and the authority order are in `CONTEXT_REQUIREMENTS.md`.
 
 **Freeze gate first.** A frozen span is not decomposed:
-- **Existing glossary card.** The source matches a confirmed glossary term — the approved form is required, and after translation it is counted as HIT or MISS (locally in 3.3b when the context-aware check runs; 3.4's glossary compliance check covers every setting). A **term-only** source (only existing glossary spans, e.g. `RESUME`, `Flight Dart`) stops here: no questions inside the span, and no context-aware fluency call later.
+- **Existing glossary card.** The source matches a glossary term with `status: "approved"` — the approved form is required (the target definition's `term`, or the entry in its `variants` whose `gender` the sentence needs), and after translation it is counted as HIT or MISS (locally in 3.3b when the context-aware check runs; 3.4's glossary compliance check covers every setting). A **term-only** source (only existing glossary spans, e.g. `RESUME`, `Flight Dart`) stops here: no questions inside the span, and no context-aware fluency call later.
+- **Candidate card.** A glossary term with `status: "candidate"` is a `glossary-candidate`: render it as its card says and pass it in `contexts` so the batch stays consistent, but it is not a lock and is not counted as HIT or MISS. A `not_a_term` card is ignored.
 - **Repeating label, no card.** A short label, name or status that repeats in the file without a card is a `glossary-candidate`: translate it consistently, record it in `tools/glossary_candidates.jsonl` (3.2) and list it for the user (glossary 2.4 flow), but it is not a lock until a card exists.
 - **Phraseologism.** A one-off sentence whose wording doesn't add up from its parts stays in the sentence; promote it to `glossary-candidate` only if it repeats or the user asks.
 - **Bare word, no card** (`Potato`, `Flight`): its sense is `open`. A short homograph that isn't term-only is UNSURE, never a lock.
@@ -175,12 +176,12 @@ Verify the exact edited cells by parsing the file again after writing.
 
 Run this after the batch is written, on the written step-3 text. It scores each string together with its neighbor strings and the choices already approved for it.
 
-**Count terminology locally.** Never ask a model whether a glossary term matches. Fetch the glossary once per session with `list_glossary_terms` and save it to `tools/glossary_terms.json`. Then, for each string, find every glossary entry whose source term occurs in the source text and check the target:
+**Count terminology locally.** Never ask a model whether a glossary term matches. Fetch the glossary once per session with `list_glossary_terms` and save it to `tools/glossary_terms.json`, keeping each term's `type` and `status` and each definition's `gender` and `variants`. Then, for each string, find every approved glossary term whose source term occurs in the source text and check the target:
 - **HIT** — an approved form is in the target; record the target span.
 - **MISS** — no approved form in the target.
 - **UNSURE** — the source word is a short homograph (`Flight`, `Strong`, `Tied`) in a segment that isn't term-only and isn't capitalized mid-sentence.
 
-Match rules: a stem plus a suffix of at most 4 letters for Russian and other heavily inflected languages, at most 3 for German; `*` matches any suffix; "also approved: …" in a definition is a second approved form; a multiword term hits when all its stems occur within a 3-token window, in any order. Placeholders are never terms. A **term-only** string (its source is only existing glossary spans) gets **no** step-4 call — record its HIT/MISS only.
+Match rules: a stem plus a suffix of at most 4 letters for Russian and other heavily inflected languages, at most 3 for German; `*` matches any suffix; each `variants[].term` of the target definition is another approved form, and so is an "also approved: …" note in the definition text of an older term; a multiword term hits when all its stems occur within a 3-token window, in any order. Placeholders are never terms. A **term-only** string (its source is only existing glossary spans) gets **no** step-4 call — record its HIT/MISS only.
 
 **Build the neighbor window.** Same file and target language only, never another translator's text, at most 8 strings. Score each already-translated candidate:
 
@@ -279,8 +280,8 @@ Run once, after the last batch of the session (3.1–3.4 done for every batch), 
    | lang | strings with terms | MISS before | compliant before | MISS after | compliant after | term occurrences before | term occurrences after |
    |---|---|---|---|---|---|---|---|
 
-   Until the platform counts approved terms only (T2), these numbers include unapproved glossary terms — report them as they are.
-4. **Push candidates once.** Show the `status: "local"` lines of `tools/glossary_candidates.jsonl` as a table (term, translation, language, evidence, strings). Push the rows the user accepts with `create_glossary_term` and `status: "candidate"` (see the `glossary` skill's 2.5 for the term shape), and mark each line `pushed` with the returned `termId`; mark rejected rows `rejected`. **This step requires the platform to support candidate status on `create_glossary_term` (T2).** If the tool has no `status` parameter, don't push — the list stays local, it is the source of truth for candidates, and tell the user it's waiting there.
+   `count_glossary_terms` counts approved terms only, so candidate terms aren't in these numbers.
+4. **Push candidates once.** Show the `status: "local"` lines of `tools/glossary_candidates.jsonl` as a table (term, translation, language, evidence, strings). Push the rows the user accepts with `create_glossary_term`, `status: "candidate"`, and the `type` and per-language `gender` when known (see the `glossary` skill's 2.5 for the term shape), and mark each line `pushed` with the returned `termId`; mark rejected rows `rejected`. Tell the user the pushed terms are candidates: they become locks, and count in translation and the glossary check, once a person approves them on the glossary page in the Algebras platform UI.
 
 ## Next
 
