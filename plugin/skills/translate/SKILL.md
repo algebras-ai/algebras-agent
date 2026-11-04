@@ -92,7 +92,7 @@ Show the batch's ambiguity table before translating it, in the user's language:
 Before step 1, look up the batch in translation memory and reuse earlier translations that fit. Run this after 3.1b — checking a draft needs the batch's `resolved` facts.
 
 **Call.** One `lookup_translation_memory` call per batch, chunked to ≤100 texts per call. Pass:
-- `texts` — the batch's source strings. When a string's speaker and addressee are known, pass it as `{ "text": "...", "speakerId": "...", "addresseeId": "..." }`; otherwise as a plain string.
+- `texts` — the batch's source strings. Pass each string's speaker and addressee as its platform context holds them — `speaker.value` and `addressee.value` in the string's context from `list_strings` (session start), whatever their status, since approved translations are stored with those values: `{ "text": "...", "speakerId": "...", "addresseeId": "..." }`, leaving out a field whose value is `null`. A plain string means no speaker and no addressee, and doesn't match an approved translation stored with either.
 - `sourceLanguage` — the explicit source language, never `auto` (rows stored with `auto` don't match an explicit language, and the reverse).
 - `targetLanguage`.
 - `glossaryId` — `project.json`'s `glossary_id` (omit it when the project has no glossary).
@@ -267,7 +267,7 @@ This applies three checks — full method descriptions are in the `qa` skill's 4
 
 - **Method A** (exact-duplicate source, zero heuristics): the batch's source strings that also occur elsewhere in the corpus must have the same target rendering everywhere.
 - **Method B** (term-embedding, heuristic): terms with an established canonical rendering elsewhere in the corpus must be rendered consistently when embedded inside this batch's sentences.
-- **Glossary compliance** (via `count_glossary_terms`): for each segment in the batch, call `count_glossary_terms` with `project.json`'s `glossary_id`, passing `sourceLanguage`, `sourceText`, `targetLanguage`, and `targetText`. A term found in the source but missing from the target (i.e. `sourceCount > 0` but `targetCount == 0` in the per-term `terms` array) is a glossary MISS. Save each segment's result as its `before` record in `tools/glossary_pass.jsonl` (shape in 3.5), and log each MISS in `tools/consistency_findings.jsonl` with status `deferred-3.5`. Don't fix glossary MISSes here — 3.5 fixes them all in one pass.
+- **Glossary compliance** (via `count_glossary_terms`): for each segment in the batch, call `count_glossary_terms` with `project.json`'s `glossary_id`, passing `sourceLanguage`, `sourceText`, `targetLanguage`, and `targetText`. A term found in the source but missing from the target (`sourceCount > 0` and `targetCount == 0` in the per-term `terms` array) is a glossary MISS — but only when the term has a definition in the target language. A term with `targetTerm: null` is a glossary gap, not a MISS: leave it out of the record's `terms` and list it in `gaps`. Save each segment's result as its `before` record in `tools/glossary_pass.jsonl` (shape in 3.5), and log each MISS in `tools/consistency_findings.jsonl` with status `deferred-3.5`. Don't fix glossary MISSes here — 3.5 fixes them all in one pass.
 
 **Review every finding before dismissing or accepting it** — the script raises signals, not verdicts. For each one, read the actual source/target context and append one line to `tools/consistency_findings.jsonl`:
 - `confirmed` (status stays `open`) if it's a real inconsistency, or
@@ -284,12 +284,12 @@ Run once, after the last batch of the session (3.1–3.4 done for every batch), 
 **Pass log.** One line per string in `tools/glossary_pass.jsonl`, updated in place rather than appended twice:
 
 ```json
-{"id": "<string/row id>", "file": "<path>", "targetLang": "de", "before": {"terms": [{"term": "Flight Dart", "sourceCount": 1, "targetCount": 0}], "miss": ["Flight Dart"]}, "status": "fixed", "after": {"terms": [{"term": "Flight Dart", "sourceCount": 1, "targetCount": 1}], "miss": []}, "reason": null}
+{"id": "<string/row id>", "file": "<path>", "targetLang": "de", "before": {"terms": [{"term": "Flight Dart", "sourceCount": 1, "targetCount": 0}], "miss": ["Flight Dart"], "gaps": []}, "status": "fixed", "after": {"terms": [{"term": "Flight Dart", "sourceCount": 1, "targetCount": 1}], "miss": []}, "reason": null}
 ```
 
 `status`: `ok` (no MISS), `miss` (not fixed yet), `fixed`, `accepted` (a false positive — `reason` says why), `user` (waiting on or decided by the user). The pass is resumable: skip strings whose `status` is `ok`, `fixed`, `accepted` or `user`, and continue from the rest.
 
-1. **Before.** For each string in scope without a `before` record (3.4 already recorded most of them), call `count_glossary_terms` with `project.json`'s `glossary_id`, `sourceLanguage`, `sourceText`, `targetLanguage` and `targetText`. A MISS is `sourceCount > 0` and `targetCount == 0` for a term in the `terms` array.
+1. **Before.** For each string in scope without a `before` record (3.4 already recorded most of them), call `count_glossary_terms` with `project.json`'s `glossary_id`, `sourceLanguage`, `sourceText`, `targetLanguage` and `targetText`. A MISS is `sourceCount > 0` and `targetCount == 0` for a term in the `terms` array that has a target term; a term with `targetTerm: null` goes to `gaps` (as in 3.4).
 2. **Fix each MISS.** Re-translate the string with `translate_text`, with `glossaryId` and without `fluency`, and a `prompt` naming the approved forms of the missing terms. Verify tags, placeholders, numbers and `resolved` facts as in 3.2, write it with the parser (3.3), record it (3.3a), then call `count_glossary_terms` again and record `after` and `status`. Strings with the same source text are fixed together so Method A stays consistent. Don't re-score fluency: set `"revised_after_scoring": true` on the string's `tools/fluency_scores.jsonl` line.
    - A string written from an `approved` TM match is never overwritten — set `status: "user"` and list it for the user.
    - If a fixed string still misses the term, read it: an inflection, word order or homograph the counter didn't recognize is `accepted` with a reason; anything else goes to the user.
