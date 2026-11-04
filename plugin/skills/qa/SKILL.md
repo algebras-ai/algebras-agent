@@ -145,7 +145,7 @@ After each batch:
   - Not locks: strings tagged `agent-choice` or `provisional`, and glossary candidates left unlocked
   - Unscored strings, and strings marked "revised after scoring"
   - All of it labeled a self-check of the agent's own translation, not independent QA
-- Context, from the platform project: coverage per section from `project.json`'s `context_coverage`, screenshot coverage, `flagged` strings (conflicts) and strings with missing facts per target language (`list_strings` with `flagged` and `missingFact`), and the top client questions from the project's `question` notes ranked by strings unblocked. Regenerate `client_questions.md` from those notes and point to it
+- Context, from the platform project: coverage per section from `project.json`'s `context_coverage`, screenshot coverage, `flagged` strings (conflicts and open important facts) and strings with missing facts per target language (`list_strings` with `flagged` and `missingFact`), and the top client questions from the project's `question` notes ranked by strings unblocked. Regenerate `client_questions.md` from those notes and point to it
 - Edits applied
 - Remaining issues for user review
 

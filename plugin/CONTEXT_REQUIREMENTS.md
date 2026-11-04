@@ -110,7 +110,7 @@ Every context fact the agent works with, whether it comes from onboard intake or
 |---|---|
 | `resolved` | The fact with `status: "confirmed"`, its `value`, and a `source` (`{kind, ref, quote?}`). The platform rejects a confirmed fact without a source. |
 | `candidate` | The fact with `status: "suggestion"` and its `value`. When the inference rests on something specific (a neighbouring line, a document), cite it as the `source` and put the reason in `quote`. |
-| `conflict` | The fact is not set, and the string's `issues` has `{field, lang?, kind: "conflict", readings: [{value, source}]}` with every reading and its source. A conflict on a project fact goes in the project's `issues`. |
+| `conflict` | The fact is not set, and the string's `issues` has `{field, lang?, kind: "conflict", readings: [{value, source}]}` with every reading and its source, which flags the string (`flagged` is true for any issue, or for an open important fact from the context evaluation; `list_strings` with `flagged: true` finds these). A conflict on a project fact goes in the project's `issues`. |
 | `open` | The fact is not set. `list_strings` with `missingFact` finds these strings. |
 
 Source kinds: a client file is `document` (`ref`: path and anchor, `quote`: the line); a source-table column is `string` (`ref`: `<externalKey>:column:<name>`); another string is `string` (`ref`: its external key); a screenshot is `screenshot`; an official web page is `document` (`ref`: the URL, `quote` required); an answer from the user is `user`; a glossary card is `glossary` (`ref`: the term id).
@@ -142,7 +142,7 @@ Tags record how a string was handled under an unresolved point. They are never e
 | `provisional` | Wording written under a `conflict`. One document note explains the conflict. |
 | `glossary-candidate` | A repeating label or formula with no approved glossary card yet: no card, or a card with `status: "candidate"`. It becomes a lock only after the user approves the card (the `glossary` skill's 2.6, or the platform UI). |
 
-An `agent-choice` reading is written to the platform as a `suggestion` without a source, so nobody reads it as decided; a `provisional` string keeps its conflict in `issues`. The tags themselves are kept in the translate phase's fluency log (`tools/fluency_scores.jsonl`, `tags`).
+An `agent-choice` reading is written to the platform as a `suggestion` without a source, so nobody reads it as decided; a `provisional` string stays `flagged` through the conflict in its `issues`. The tags themselves are kept in the translate phase's fluency log (`tools/fluency_scores.jsonl`, `tags`).
 
 Glossary term status is counted locally, never by a model: `HIT` (an approved card's form — its `term` or one of its `variants` — is in the target; that span is a lock), `MISS` (approved form absent), `UNSURE` (a homograph in a segment that is not term-only; no lock). A segment whose source is only existing glossary spans is **term-only**.
 

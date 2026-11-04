@@ -255,7 +255,11 @@ export function buildReport({ facts, payload, readback }) {
     if (!stored) continue;
     const context = stored.context?.data ?? {};
     for (const [name, local] of Object.entries(line.facts ?? {})) {
-      const outcome = compareFact(name, line.lang, local, context, project);
+      let outcome = compareFact(name, line.lang, local, context, project);
+      // A conflict stored on the string has to flag it.
+      if (outcome === "same" && local.status === "conflict" && (context.issues ?? []).length && !stored.flagged) {
+        outcome = "not_flagged";
+      }
       const fact = name.replace(/\[.*\]$/, "");
       const row = ((report.facts[fact] ??= {})[local.status] ??= {});
       row[outcome] = (row[outcome] ?? 0) + 1;

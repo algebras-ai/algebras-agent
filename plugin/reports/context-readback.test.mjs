@@ -163,6 +163,23 @@ test("the report counts per fact and status, and a missing string fails", () => 
   assert.equal(report.evaluatorFacts, 1);
 });
 
+test("a conflict stored on a string has to flag it", () => {
+  const readings = [{ value: "Fem", source: DOC }];
+  const issue = { field: "speaker.gender", kind: "conflict", readings };
+  const facts = [{ externalKey: "a.po#1", lang: "fr", facts: { speaker_gender: { status: "conflict", readings } } }];
+  const strings = (flagged, issues) => ({
+    project: { context: { data: PROJECT } },
+    strings: [{ externalKey: "a.po#1", flagged, context: { data: { issues } } }],
+  });
+  assert.equal(buildReport({ facts, payload: null, readback: strings(true, [issue]) }).ok, true);
+  const report = buildReport({ facts, payload: null, readback: strings(false, [issue]) });
+  assert.equal(report.ok, false);
+  assert.deepEqual(report.facts.speaker_gender, { conflict: { not_flagged: 1 } });
+  // A conflict held on the project doesn't flag one string.
+  const onProject = { project: { context: { data: { ...PROJECT, issues: [issue] } } }, strings: [{ externalKey: "a.po#1", flagged: false, context: { data: {} } }] };
+  assert.equal(buildReport({ facts, payload: null, readback: onProject }).ok, true);
+});
+
 test("placement and discourse from the import are compared per string", () => {
   const payload = {
     strings: [
