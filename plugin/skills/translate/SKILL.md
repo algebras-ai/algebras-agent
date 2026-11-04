@@ -117,6 +117,14 @@ Approved matches are translations people approved in review — in the platform'
 
 `action` is `written` (used as is), `retranslated` (draft failed a check — `reason` says which) or `rejected-glossary` (failed the glossary filter, translated as a miss). Misses aren't logged here.
 
+**Call log.** Append one line per `translate_batch`, `translate_batch_async`, `translate_text` and `record_translations` call to `tools/translate_calls.jsonl`, so the run can be checked afterwards (3.5's run report):
+
+```json
+{"step": "3", "tool": "translate_batch", "targetLang": "de", "glossaryId": "<id>", "origin": null, "strings": [{"id": "<string/row id>", "file": "<path>"}], "time": "<ISO 8601>"}
+```
+
+`step` is `1` (no-glossary throwaway), `3` (final translation), `fix` (a single-string step-3 fix, including a failed TM draft), `3.5` (final glossary pass) or `record` (3.3a; `origin` is `machine`). The `qa` skill's 4.6 adds `review` lines: `set_translation_status` calls with their `status`, and `record_translations` calls with `origin: "manual"`. `strings` lists the strings the call sent, in the same `id`/`file` form as `tm_hits.jsonl`; `glossaryId` is `null` when the call had none. Log the call when you send it, not only when it succeeds.
+
 ## 3.2 Translate and measure — per the fluency setting
 
 Every translation and every score comes from the `algebras` MCP server's tools — never generate translated text or a fluency score yourself. Every row starts with 3.2.0's TM lookup; the steps below run on its misses only. Which calls run per batch depends on `project.json`'s `fluency` (chosen in onboard 1.2d; never re-ask):
@@ -285,7 +293,14 @@ Run once, after the last batch of the session (3.1–3.4 done for every batch), 
 2. **Fix each MISS.** Re-translate the string with `translate_text`, with `glossaryId` and without `fluency`, and a `prompt` naming the approved forms of the missing terms. Verify tags, placeholders, numbers and `resolved` facts as in 3.2, write it with the parser (3.3), record it (3.3a), then call `count_glossary_terms` again and record `after` and `status`. Strings with the same source text are fixed together so Method A stays consistent. Don't re-score fluency: set `"revised_after_scoring": true` on the string's `tools/fluency_scores.jsonl` line.
    - A string written from an `approved` TM match is never overwritten — set `status: "user"` and list it for the user.
    - If a fixed string still misses the term, read it: an inflection, word order or homograph the counter didn't recognize is `accepted` with a reason; anything else goes to the user.
-3. **Compliance.** Per target language, before and after the fixes: strings with at least one glossary term in the source, strings with a MISS, the share of strings without a MISS (%), and term occurrences found in the target out of those in the source (count and %). Write it to `tools/glossary_compliance.json` and show it as a table:
+3. **Compliance.** Per target language, before and after the fixes: strings with at least one glossary term in the source, strings with a MISS, the share of strings without a MISS (%), and term occurrences found in the target out of those in the source (count and %). Write it to `tools/glossary_compliance.json`, keyed by target language:
+
+   ```json
+   {"de": {"before": {"strings_with_terms": 40, "miss": 6, "compliant_pct": 85.0, "occurrences_found": 51, "occurrences_source": 58, "occurrences_pct": 87.9},
+           "after":  {"strings_with_terms": 40, "miss": 1, "compliant_pct": 97.5, "occurrences_found": 57, "occurrences_source": 58, "occurrences_pct": 98.3}}}
+   ```
+
+   A string counts once per term in its source: a term occurrence is found when the target has it (`min(targetCount, sourceCount)`); `after` is a string's `after` record, or its `before` record when it has none. Percentages have one decimal. Show it as a table:
 
    | lang | strings with terms | MISS before | compliant before | MISS after | compliant after | term occurrences before | term occurrences after |
    |---|---|---|---|---|---|---|---|
