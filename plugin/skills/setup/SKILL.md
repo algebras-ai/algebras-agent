@@ -37,6 +37,13 @@ for phase in onboard glossary glossary-dedupe translate qa; do
 done
 ```
 
+Copy the run report script the `translate` and `qa` skills end a run with:
+
+```bash
+mkdir -p "$PROJECT_ROOT/tools"
+cp -n "${PLUGIN_ROOT}/reports/run-report.mjs" "$PROJECT_ROOT/tools/run-report.mjs" 2>/dev/null || true
+```
+
 Report which files were copied and which were skipped (already existed).
 
 ## Step 2 — Resolve the API key
@@ -211,6 +218,7 @@ Setup complete.
 
   Workflow files  →  copied to <PROJECT_ROOT>
   Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,glossary-dedupe,translate,qa}
+  Run report      →  copied to <PROJECT_ROOT>/tools/run-report.mjs
   API key         →  validated and saved to <PROJECT_ROOT>/.env (source: <env / project .env / global cache / device auth / fresh paste>)
   MCP server      →  registered in <Claude or Codex MCP config>
 

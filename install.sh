@@ -75,6 +75,13 @@ for phase in "${PHASE_SKILLS[@]}"; do
     echo "  Copied:  $file"
   fi
 done
+if [[ -f tools/run-report.mjs ]]; then
+  echo "  Skipped: tools/run-report.mjs (already exists)"
+else
+  mkdir -p tools
+  curl -fsSL "$GITHUB_RAW/reports/run-report.mjs" -o tools/run-report.mjs
+  echo "  Copied:  tools/run-report.mjs"
+fi
 
 # ── API key ───────────────────────────────────────────────────────────────────
 

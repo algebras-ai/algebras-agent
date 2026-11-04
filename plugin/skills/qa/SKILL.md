@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Phase 4 of the Algebras translation workflow (QA Review) — local QA with the project flow's checks, full-corpus terminology consistency, reading the fluency scores captured during translation (context-free baseline and/or context-aware decisions, no new calls), reviewer-agent proofreading, and the context report. Requires at least one batch already translated and written to disk.
-allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__detect_languages_batch, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__get_project_context, mcp__algebras__list_strings, mcp__algebras__record_translations, mcp__algebras__set_translation_status, mcp__algebras__list_translations]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(node tools/run-report.mjs:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__detect_languages_batch, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__get_project_context, mcp__algebras__list_strings, mcp__algebras__record_translations, mcp__algebras__set_translation_status, mcp__algebras__list_translations]
 ---
 
 # Phase 4 — QA Review
@@ -132,6 +132,7 @@ After each batch:
 - Consistency QA: Method A / Method B / glossary-anchored findings — confirmed, false-positive, fixed-inline, and still-open counts
 - Glossary compliance per target language, before and after the `translate` skill's 3.5 (counts and %, from `tools/glossary_compliance.json`), strings still missing a term (`accepted` or `user` in `tools/glossary_pass.jsonl`), glossary candidates pushed or kept local (`tools/glossary_candidates.jsonl`), and glossary terms still `candidate` on the platform (`list_glossary_terms` with `status: "candidate"`) — offer the `glossary` skill's 2.6 approval table for them
 - Translation memory reuse per target language, from `tools/tm_hits.jsonl`: approved matches written, unreviewed matches written, re-translated, and rejected by the glossary filter
+- The run report: `node tools/run-report.mjs` (the `translate` skill's 3.5 step 5 says where to get it) — TM-hit strings sent to translation (must be 0), written strings not recorded on the platform (must be 0), and whether the compliance numbers match the pass log. Re-run it after 4.6 to include the review outcomes
 - Fluency self-check, per the project's `fluency` setting:
   - `none`: "not measured (project setting)"
   - context-free score (`isolated`, `both`): min, mean, any below 6 — labeled as the pre-glossary baseline, not a score of the shipped text
