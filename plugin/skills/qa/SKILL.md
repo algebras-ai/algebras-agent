@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Phase 4 of the Algebras translation workflow (QA Review) — local QA with the project flow's checks, full-corpus terminology consistency, reading the fluency scores captured during translation (context-free baseline and/or context-aware decisions, no new calls), reviewer-agent proofreading, and the context report. Requires at least one batch already translated and written to disk.
-allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__get_project_context, mcp__algebras__list_strings]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__detect_languages_batch, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__get_project_context, mcp__algebras__list_strings]
 ---
 
 # Phase 4 — QA Review
@@ -17,9 +17,16 @@ allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)
 After each translation batch, run all available tools in `tools/`, plus the checks listed under "QA emphasis" for `project.json`'s `project_type` in `PROJECT_TYPES.md` (or the file's entry in `file_flows`). Common checks:
 - **Length expansion** — text length within safe bounds. Games: short UI expanded by more than 30% (or past a stated limit) is a finding.
 - **Numeric preservation** — all numbers match source. Fintech: currency codes, IBANs, masked card numbers and license numbers match too.
-- **Mixed-language / source leakage** — no untranslated segments, except names the flow's `keep` list leaves as in the source
+- **Mixed-language / source leakage** — no untranslated segments, except names the flow's `keep` list leaves as in the source. Checked with `detect_languages_batch` (see below).
 - **Flow-specific** — edtech: option count, option order and the marked correct option are unchanged, and feedback still names that option. Fintech: a locked status uses the glossary term, and a legally locked string doesn't read weaker than the source (a finding for the user, never an automatic rewrite). SaaS: ICU and placeholder syntax match, and a help article uses the same label as the translated UI button. Games: tags intact, and a `resolved` formality marker the target doesn't use is a finding to review.
 - **Resolved facts honored** — a string whose platform context has a confirmed fact (speaker gender, address form, referent, item role) uses it; a string with an unresolved fact doesn't commit to it unless it is tagged `agent-choice` or `provisional` (`tags` in `tools/fluency_scores.jsonl`).
+
+**Untranslated check.** For every string written in scope (translated strings and TM matches; existing translations kept from onboard 1.2c are out of scope), per target language, call `detect_languages_batch` with `sourceLanguage`, `targetLanguage` and `items` of `{ "id": "<string id>", "text": "<target text>", "sourceText": "<source text>" }` — at most 500 items per call, ids unique within a call. A string whose source is only names from the flow's `keep` list isn't sent: record it as `skipped` with reason `keep`. Use only `results[].id`, `status`, `reason` and `counts`:
+- `untranslated` — the target is in the source language. A finding: re-translate it (a step-3 fix, as in the `translate` skill's 3.2) or record it as an accepted exception with the user's reason.
+- `unsure` (short text, no letters, unreliable detection, or a third language) and `skipped` (names, numbers or placeholders only) — list them for review with their reason. They are not failures.
+- `translated` — nothing to do.
+
+Write one line per string to `tools/untranslated_check.jsonl` — `{"id", "file", "targetLang", "status", "reason", "resolution"}`, `resolution` being `fixed`, `accepted` or `null` — updated in place. On a later run, send only strings edited since. If the tool returns 400 for a language (not supported), report that language as "not checked" and continue with the others.
 
 Glossary terminology and cross-batch consistency are handled separately and more rigorously — see the `translate` skill's 3.4 (mid-batch) and 4.2 below (full-corpus).
 
@@ -121,6 +128,7 @@ Apply only user-approved edits. Re-run 4.1's local QA and 4.2's consistency chec
 After each batch:
 - Row range and languages processed
 - QA findings by type and count
+- Untranslated check per target language, from `tools/untranslated_check.jsonl`: untranslated (fixed / accepted / open), unsure and skipped counts, and languages not checked
 - Consistency QA: Method A / Method B / glossary-anchored findings — confirmed, false-positive, fixed-inline, and still-open counts
 - Glossary compliance per target language, before and after the `translate` skill's 3.5 (counts and %, from `tools/glossary_compliance.json`), strings still missing a term (`accepted` or `user` in `tools/glossary_pass.jsonl`), glossary candidates pushed or kept local (`tools/glossary_candidates.jsonl`), and glossary terms still `candidate` on the platform (`list_glossary_terms` with `status: "candidate"`) — offer the `glossary` skill's 2.6 approval table for them
 - Translation memory reuse per target language, from `tools/tm_hits.jsonl`: approved matches written, unreviewed matches written, re-translated, and rejected by the glossary filter

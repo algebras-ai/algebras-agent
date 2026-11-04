@@ -138,7 +138,6 @@ Write `project.json` based on what you've discovered. Do not copy a template —
   "target_fields": {
     "<lang_code>": "<column name / key>"
   },
-  "non_latin_langs": [],
   "glossary_id": null,
   "project_id": null,
   "mcp_url": "https://platform.algebras.ai/api/mcp",

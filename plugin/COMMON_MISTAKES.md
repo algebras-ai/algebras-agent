@@ -13,7 +13,7 @@ Reference taxonomy of recurring translation errors. Use this when reviewing tran
 - `Texturing Artista`
 - `Texturing 美术`
 
-**QA rule:** Detect mixed-language contamination and retained source fragments beyond approved glossary or brand terms. Flag extra Latin tokens in non-Latin targets.
+**QA rule:** Run the untranslated check (`detect_languages_batch`, the `qa` skill's 4.1) on every written string: `untranslated` is a finding to fix; `unsure` and `skipped` go to review. For mixed strings the detector reads as translated, review retained source fragments beyond approved glossary, brand and `keep`-list names.
 
 ---
 
