@@ -182,7 +182,7 @@ Verify the exact edited cells by parsing the file again after writing.
 
 ## 3.3a Record the written translations
 
-Every translation written to a file is also recorded on the platform project as a draft for review, so people can approve it in the platform's review screen or in the `qa` skill's 4.6, and translation memory reuses it once approved. After writing a chunk, call `record_translations` with `project.json`'s `project_id` and one item per written string: `{ "externalKey": "<file>#<id>", "language": "<target>", "text": "<the written text>", "origin": "machine" }` — the `externalKey` onboard 1.6 imported the string with. Chunk the calls to the tool's item limit.
+Every translation written to a file is also recorded on the platform project as a draft for review, so people can approve it in the platform's review screen or in the `qa` skill's 4.6, and translation memory reuses it once approved. After writing a chunk, call `record_translations` with `projectId` (`project.json`'s `project_id`), `source: "translate"` and one item per written string: `{ "externalKey": "<file>#<id>", "language": "<target>", "text": "<the written text>", "origin": "machine" }` — the `externalKey` onboard 1.6 imported the string with. At most 500 items per call.
 
 - This covers TM matches too. The one exception is an approved match that already is this string's own approved translation — recording it again would only add a duplicate draft.
 - A step-3 fix (a re-translated failed TM draft or a broken placeholder) and a 3.5 fix are recorded the same way after they're written; the new draft replaces the string's earlier draft.

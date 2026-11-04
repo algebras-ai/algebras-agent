@@ -149,7 +149,7 @@ After each batch:
 
 Translation memory reuses only approved translations, and every string written this run is a draft on the platform until someone approves it (the `translate` skill's 3.3a). When the user is done with this run's batches, offer to review the drafts here; they can also review them in the Algebras platform's review screen instead. Skip this step when running non-interactively in CI — the drafts stay drafts.
 
-1. Call `list_translations` with `project.json`'s `project_id`, `status: "draft"` and one target language at a time, following the cursor to the end.
+1. Call `list_translations` with `projectId` (`project.json`'s `project_id`), `language` (one target language at a time) and `status: "draft"`. It is paged: pass `page` (from 1) and `limit` (up to 100), and keep requesting the next page until you have read `total` rows. Each row has the string's `externalKey`, its source text, `draft` and `approved` (each with its revision `id` and `text`, or `null`) and `rejectedCount`.
 2. Show the drafts as a table, in pages of about 50 rows:
 
    | # | string | source | draft | approved now | QA notes |
@@ -159,9 +159,9 @@ Translation memory reuses only approved translations, and every string written t
 
    **Actions**: Approve all on this page / Approve rows (list the numbers) / Edit a row (reply with the number and your wording) / Reject rows / Leave as draft
 3. Apply exactly what the user said:
-   - **approved** rows — `set_translation_status` with the revision ids and `status: "approved"`. Never approve a row the user didn't approve; "approve all" covers only the page shown.
+   - **approved** rows — `set_translation_status` with `projectId` and `items` of `{ "revisionId": <the row's draft id>, "status": "approved" }` (up to 500 per call). Never approve a row the user didn't approve; "approve all" covers only the page shown.
    - **edited** rows — the user's own wording: write it to the file with the parser, re-run 4.1's checks on it, and record it with `record_translations`, `origin: "manual"`, which the platform stores as approved. Wording you or a reviewer proposed and the user accepted is `origin: "machine"` and stays a draft until approved.
-   - **rejected** rows — `set_translation_status` with `status: "rejected"`. Ask whether to re-translate them (a step-3 fix, recorded as a new draft) or leave the file text for the user.
+   - **rejected** rows — `set_translation_status` with `{ "revisionId": <the row's draft id>, "status": "rejected" }`. Ask whether to re-translate them (a step-3 fix, recorded as a new draft) or leave the file text for the user.
    - everything else stays a draft.
 4. Report per target language: drafts shown, approved, edited (manual), rejected, left as draft.
 
