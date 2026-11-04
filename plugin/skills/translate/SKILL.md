@@ -17,8 +17,8 @@ allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)
 
 Once per session, before the first batch:
 
-1. `get_project_context` with `project.json`'s `project_id`. Keep the project context and its `version`.
-2. `list_strings`, following the cursor to the end. Keep each string's context and `version`, and the project's context version as `last_seen_version`.
+1. `get_project_context` with `project.json`'s `project_id`. Keep the project context and its `context.version`.
+2. `list_strings`, following the cursor to the end. Keep each string's `context.data` and `context.version`, and the first page's `contextVersion` as `last_seen_version` (`CONTEXT_REQUIREMENTS.md`, "Versions").
 
 Keep this in memory. When a local tool needs the context (e.g. `tools/fluency_ctx.py` in 3.3b), write it to `tools/context_cache.json` and pass that file to the tool; it's a disposable copy, refreshed whenever the context is re-read, and never edited by hand.
 
@@ -43,7 +43,7 @@ The `qa` skill's 4.7 commits the result on this branch at the end.
 
 ## 3.1 State rules before each batch
 
-**Pull changes first.** People edit context in the platform UI while the agent works. Before each batch, call `list_strings` with `changedSinceVersion` = `last_seen_version`, and `list_context_changes` for who changed what. Replace the changed strings' contexts (and the project context, if it changed) with the fresh copies and advance `last_seen_version`. If a change touches a string in this batch, or a fact a string already written relied on, tell the user what changed and who changed it; for strings already written, list them and ask whether to retranslate.
+**Pull changes first.** People edit context in the platform UI while the agent works. Before each batch, call `list_strings` with `changedSinceVersion` = `last_seen_version`, and `list_context_changes` with `sinceVersion` = `last_seen_version` for who changed what. Replace the changed strings' contexts with the fresh copies, call `get_project_context` again if a change has `recordType: "PROJECT_CONTEXT"`, and set `last_seen_version` to the `contextVersion` these calls returned. If a change touches a string in this batch, or a fact a string already written relied on, tell the user what changed and who changed it; for strings already written, list them and ask whether to retranslate.
 
 Read the translation rules for `project.json`'s `project_type` in `PROJECT_TYPES.md`. If `file_flows` names a flow for this file, use that flow's rules instead.
 
@@ -75,12 +75,12 @@ Before translating, find what the batch's strings leave undecided — the points
 
 Give each point a status: `resolved` when the platform context (a confirmed fact), a cited string id, a source column, a screenshot or a quoted official page decides it; `conflict` when two sources or two string groups point different ways; otherwise `open`. For points still `open` or in `conflict`, run one leftover web search each (product name plus the string), open the page and quote the line; a page that disagrees with an existing source makes the point a `conflict`.
 
-**Write the facts to the platform.** Store each new or changed fact as `CONTEXT_REQUIREMENTS.md` maps it ("How a status is stored on the platform", "Where each fact goes"): string facts with `update_string_contexts` — one call per batch, up to about 200 items, each with the string's `baseVersion` and the fact's `source` — and project facts (a character's gender, a relation's register, a question note) with `update_project_context` and the project's `baseVersion`. A `conflict` sets the string's `flagged` and adds or extends a `question` note with both readings. Keep the versions the results return. Each item comes back `ok`, `conflict` or `invalid`; follow "Writes" in `CONTEXT_REQUIREMENTS.md` for the last two: re-read, retry once, then report to the user without overwriting.
+**Write the facts to the platform.** Store each new or changed fact as `CONTEXT_REQUIREMENTS.md` maps it ("How a status is stored on the platform", "Where each fact goes"): string facts with `update_string_contexts` — one call per batch, up to about 200 items, each with the string's whole `context.data` plus the change (a write replaces the record: `CONTEXT_REQUIREMENTS.md`, "Writes"), its `baseVersion` and the fact's `source` — and project facts (a character's gender, a relation's register, a question note) with `update_project_context` and the project's `baseVersion`. A `conflict` adds an entry to the string's `issues` with both readings and their sources. Keep the versions the results return, and use what you wrote from here on. Each item comes back `ok`, `conflict`, `invalid` or `not_found`; follow "Writes" in `CONTEXT_REQUIREMENTS.md` for the last three: on a conflict, re-read, retry once, then report to the user without overwriting.
 
 **Handoff to 3.2:**
 - `resolved` — a hard constraint; pass it with its evidence.
 - `open` — the translation may commit to a reading only where the wording can't avoid it; tag that string `agent-choice` (in its fluency log line, `tags`) and write the reading as a `suggestion` with no source. An `agent-choice` is never evidence for another string.
-- `conflict` — write one document note for the file (both readings, both sources), make sure the platform has the `question` note and the string is `flagged`, and tag any wording that commits to a reading `provisional` (in its fluency log line, `tags`).
+- `conflict` — write one document note for the file (both readings, both sources), make sure the string's `issues` on the platform has the conflict, and tag any wording that commits to a reading `provisional` (in its fluency log line, `tags`).
 
 Show the batch's ambiguity table before translating it, in the user's language:
 
@@ -153,7 +153,7 @@ Pick the tool per step, independently:
 
 For a string with an unresolved fact, add a `prompt` instruction to choose wording that doesn't commit to it (a gender-neutral construction; a phrasing that avoids tu/vous until formality is known). Never invent a speaker, a learner's gender, or a customer's gender. Apply the rest of the flow's translation rules: games keep tags and don't choose an open formality; edtech keeps the marked correct option, the option order and the difficulty; fintech uses the locked status term, leaves identifiers and currency codes, and doesn't soften a legally locked string; saas keeps ICU and the length limit.
 
-If the user answers a client question mid-run, write the answer to the platform: `update_string_contexts` for the strings it decides (confirmed, source `{"kind": "user"}`, clear `flagged` when it settles the conflict) or `update_project_context` for a project-level fact, with `baseVersion` as in 3.1b, and update or remove the `question` note. If `client_questions.md` exists, regenerate it from the notes. Then continue the current batch with those facts. Don't retranslate strings already written — list the affected string ids and ask whether to retranslate them.
+If the user answers a client question mid-run, write the answer to the platform: `update_string_contexts` for the strings it decides (confirmed, source `{"kind": "user"}`, removing the `issues` entry when it settles the conflict) or `update_project_context` for a project-level fact, with `baseVersion` as in 3.1b, and update or remove the `question` note. If `client_questions.md` exists, regenerate it from the notes. Then continue the current batch with those facts. Don't retranslate strings already written — list the affected string ids and ask whether to retranslate them.
 
 **Apply glossary terms exactly (step 3).** For source terms not yet in the glossary:
 1. Search the web for established translations before coining your own.

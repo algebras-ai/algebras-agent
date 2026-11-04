@@ -181,6 +181,7 @@ The agent onboards your project, builds a glossary, translates, and runs QA, ask
 | `COMMON_MISTAKES.md` | Error taxonomy from real-world LQA |
 | `skills/<phase>/SKILL.md` | The phases: `onboard`, `glossary`, `translate`, `qa`, plus optional `glossary-dedupe` |
 | `reports/run-report.mjs` | Checks a run from the agent's logs: translation memory reuse, recorded translations, glossary compliance before and after the final pass (copied to `tools/` by setup) |
+| `reports/context-readback.mjs` | Compares the local context files with what the platform project holds after an import: facts, statuses and sources (copied to `tools/` by setup) |
 
 [`AGENTS.md`](AGENTS.md) at the repository root is the entry point for agents that follow this repo's URL without installing anything.
 

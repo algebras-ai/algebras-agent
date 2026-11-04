@@ -12,13 +12,15 @@ The Algebras platform project is the single source of truth for context. Its pro
 
 `project.json`'s `project_id` names the platform project. Local files are never the store: `context_pack.json` and `context_facts.jsonl` are the import input onboard builds from the repo (see onboard 1.6), `tools/context_cache.json` is a disposable copy written only when a local tool needs the context, and `client_questions.md` is an export of the project's question notes.
 
-**Writes.** Every record carries a `version`. A write passes the version it was based on (`baseVersion`) and a `source`. A write based on a stale version is refused with a `conflict` and the server's current copy. Then the agent:
+**Versions.** Two numbers are easy to mix up. A record's own `version` (`context.version`, on the project context and on each string) is the `baseVersion` of a write to that record. The project-wide `contextVersion` (`project.contextVersion` from `get_project_context`, `contextVersion` from `list_strings`) moves with every change in the project and is what `changedSinceVersion` and `list_context_changes`' `sinceVersion` take.
+
+**Writes.** A write replaces the whole record. Start from the `context.data` you read, change only the facts you mean to change, and send all of it, including `evaluation` and every other field, or what you leave out is lost. A write passes the version it was based on (`baseVersion`) and a `source`. A write based on a stale version is refused with a `conflict` and the server's current copy. Then the agent:
 
 1. re-reads the record (`get_string_context` or `get_project_context`);
 2. re-applies its change to the fresh copy if the change still makes sense there, and retries once;
 3. if the retry conflicts too, or the fresh copy already decides the point differently, does not overwrite it: it reports the string, the server's value and who changed it (`list_context_changes`) to the user.
 
-An `invalid` result means the payload broke the schema: fix it and retry, or report it.
+An `invalid` result means the payload broke the schema: fix it and retry, or report it. `not_found` means the string isn't on the platform: import it (onboard 1.6). `update_string_contexts` reports these per item, as `status`. `update_project_context` returns them as an error result with `error: "conflict"`, `"invalid"` or `"not_found"`, and a conflict there also carries `currentVersion` and `current`.
 
 ## The eight sections
 
@@ -108,7 +110,7 @@ Every context fact the agent works with, whether it comes from onboard intake or
 |---|---|
 | `resolved` | The fact with `status: "confirmed"`, its `value`, and a `source` (`{kind, ref, quote?}`). The platform rejects a confirmed fact without a source. |
 | `candidate` | The fact with `status: "suggestion"` and its `value`. When the inference rests on something specific (a neighbouring line, a document), cite it as the `source` and put the reason in `quote`. |
-| `conflict` | The fact is not set, the string is `flagged`, and the project has a `question` note that gives every reading with its source and names the affected strings. |
+| `conflict` | The fact is not set, and the string's `issues` has `{field, lang?, kind: "conflict", readings: [{value, source}]}` with every reading and its source. A conflict on a project fact goes in the project's `issues`. |
 | `open` | The fact is not set. `list_strings` with `missingFact` finds these strings. |
 
 Source kinds: a client file is `document` (`ref`: path and anchor, `quote`: the line); a source-table column is `string` (`ref`: `<externalKey>:column:<name>`); another string is `string` (`ref`: its external key); a screenshot is `screenshot`; an official web page is `document` (`ref`: the URL, `quote` required); an answer from the user is `user`; a glossary card is `glossary` (`ref`: the term id).
@@ -117,9 +119,9 @@ Source kinds: a client file is `document` (`ref`: path and anchor, `quote`: the 
 
 | Fact | Platform field |
 |---|---|
-| Speaker | String `speaker` (a character id; `null` for narration and UI) |
+| Speaker | String `speaker` (a character id; a fact whose `value` is `null` for narration and UI) |
 | Speaker gender | That character's `gender` in the project context. Gender doesn't vary by target language: one value for every language, and languages that disagree make a `conflict` |
-| Addressee | String `addressee` (a character id, `"user"` for the product's user, `null` for nobody in particular) |
+| Addressee | String `addressee` (a character id, `"user"` for the product's user, a fact whose `value` is `null` for nobody in particular) |
 | Addressee gender | That character's `gender` |
 | Addressee number | String `addresseeNumber` (`Sing` or `Plur`) |
 | Formality, per target language | `relations[].register[lang]` for a speaker-to-listener pair, `defaults.userRegister[lang]` for text addressed to the product's user, string `register[lang]` for a string that differs from both. Values `Infm` or `Form`. A matrix cell the client must decide is `null` |
@@ -140,7 +142,7 @@ Tags record how a string was handled under an unresolved point. They are never e
 | `provisional` | Wording written under a `conflict`. One document note explains the conflict. |
 | `glossary-candidate` | A repeating label or formula with no approved glossary card yet: no card, or a card with `status: "candidate"`. It becomes a lock only after the user approves the card (the `glossary` skill's 2.6, or the platform UI). |
 
-An `agent-choice` reading is written to the platform as a `suggestion` without a source, so nobody reads it as decided; a `provisional` string stays `flagged`. The tags themselves are kept in the translate phase's fluency log (`tools/fluency_scores.jsonl`, `tags`).
+An `agent-choice` reading is written to the platform as a `suggestion` without a source, so nobody reads it as decided; a `provisional` string keeps its conflict in `issues`. The tags themselves are kept in the translate phase's fluency log (`tools/fluency_scores.jsonl`, `tags`).
 
 Glossary term status is counted locally, never by a model: `HIT` (an approved card's form — its `term` or one of its `variants` — is in the target; that span is a lock), `MISS` (approved form absent), `UNSURE` (a homograph in a segment that is not term-only; no lock). A segment whose source is only existing glossary spans is **term-only**.
 
