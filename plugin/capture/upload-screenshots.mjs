@@ -3,7 +3,7 @@
 // project: POST /api/v1/context/projects/{id}/screenshots, in batches.
 // The platform stores the images and links each one to the strings it shows.
 //
-//   node upload-screenshots.mjs --manifest runs/naga/manifest.json \
+//   node upload-screenshots.mjs --manifest runs/<name>/manifest.json \
 //     --project <projectId> [--key-pattern 'segments.json#row-{row}'] \
 //     [--batch 25] [--dry-run]
 //
