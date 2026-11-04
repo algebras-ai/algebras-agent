@@ -43,7 +43,7 @@ The `qa` skill's 4.7 commits the result on this branch at the end.
 
 ## 3.1 State rules before each batch
 
-**Pull changes first.** People edit context in the platform UI while the agent works. Before each batch, call `list_strings` with `changedSinceVersion` = `last_seen_version`, and `list_context_changes` with `sinceVersion` = `last_seen_version` for who changed what. Replace the changed strings' contexts with the fresh copies, call `get_project_context` again if a change has `recordType: "PROJECT_CONTEXT"`, and set `last_seen_version` to the `contextVersion` these calls returned. If a change touches a string in this batch, or a fact a string already written relied on, tell the user what changed and who changed it; for strings already written, list them and ask whether to retranslate.
+**Pull changes first.** People edit context in the platform UI while the agent works. Before each batch, call `list_strings` with `changedSinceVersion` = `last_seen_version`, and `list_context_changes` with `sinceVersion` = `last_seen_version` for who changed what. Replace the changed strings' contexts with the fresh copies, call `get_project_context` again if a change has `recordType: "PROJECT_CONTEXT"`, and set `last_seen_version` to the `contextVersion` these calls returned. The context evaluation's writes (`actor.source` starting with `context-evaluation`) are suggestions and your own writes are already known: take them in without telling the user. If anyone else's change touches a string in this batch, or a fact a string already written relied on, tell the user what changed and who changed it; for strings already written, list them and ask whether to retranslate.
 
 Read the translation rules for `project.json`'s `project_type` in `PROJECT_TYPES.md`. If `file_flows` names a flow for this file, use that flow's rules instead.
 
@@ -138,6 +138,8 @@ Each string is measured **at most once per mode** — once context-free (step 2)
 
 **Step 3 — final, with glossary (always).** Call `translate_batch`/`translate_text` (or `translate_batch_async` — see below) on the texts, **with** `glossaryId` set to `project.json`'s `glossary_id`, and without `fluency` — this call's output is what actually gets written in 3.3. Step 1's translation, if there was one, is discarded.
 
+The translate calls take the platform's spelling of a language. If one answers `Invalid language` for a code the project stores (`pt-BR`), send its underscore form (`pt_BR`); keep the project's spelling everywhere else.
+
 Chunk every translate and fluency call to ≤20 texts (the cap on `translate_batch`/`translate_batch_async` and `check_fluency_batch`), with the same chunking across the steps. If the batch you declared in 3.1 is larger, sub-chunk it here without changing what counts as "the batch" for 3.4's consistency check.
 
 Pick the tool per step, independently:
@@ -173,6 +175,8 @@ For credits: translate roles and departments; preserve person names, company nam
 Use the parser from Phase 1 to write results. Write only step 3's (glossary-applied) output — never step 1's throwaway translation. Write only the target language field/column for the requested rows. Never overwrite source text or other columns. If no suitable tool exists, generate one before writing.
 
 Verify the exact edited cells by parsing the file again after writing.
+
+**No translation files** (`project.json`'s `files` is `[]`, a platform-only project the user didn't point to files for). There is nothing to parse or write: the platform project is where the translations land, recorded in 3.3a. Later steps read the written text from what you recorded (`list_translations`) instead of a file, and "write it" means record it. Consistency tools (3.4) take that list as their input.
 
 ## 3.3a Record the written translations
 
