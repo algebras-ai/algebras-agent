@@ -86,8 +86,9 @@ tr 20 ok, 4 user; pt-BR 21 ok, 2 fixed, 1 user.
 
 ## Platform findings (reported to the platform pane)
 
-- `POST /translation/translate-batch` rejects `pt-BR` ("Invalid language")
-  and accepts only `pt_BR`, while projects, the review API, the TM lookup and
-  the glossary counter accept `pt-BR`. The run translated with `pt_BR`.
+- At run time `POST /translation/translate-batch` accepted only `pt_BR`,
+  while projects, the review API, the TM lookup and the glossary counter
+  accepted `pt-BR`; the run translated with `pt_BR`. The platform branch
+  accepts both spellings from commit `d78ea9c`.
 - One `translate-batch` call returned a 500 once; the same call succeeded on
   retry.

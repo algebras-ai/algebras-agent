@@ -278,7 +278,7 @@ After each translation batch, run all available tools in `tools/`. Common checks
 - **Glossary terminology** — terms used correctly; fetch current terms via the `list_glossary_terms` MCP tool against `project.json`'s `glossary_id` (the glossary is a platform record, not a local file) and match against each term's per-language `definitions[].term`
 - **Length expansion** — text length within safe bounds
 - **Numeric preservation** — all numbers match source
-- **Mixed-language / source leakage** — no untranslated segments: call the `detect_languages_batch` MCP tool per target language with `items` of `{id, text: <target>, sourceText: <source>}` (≤500 per call; strings whose source is only `keep`-list names are recorded as `skipped` and not sent). `untranslated` is a finding to fix or accept; `unsure` and `skipped` are listed for review, not failures. Log each result in `tools/untranslated_check.jsonl`
+- **Mixed-language / source leakage** — no untranslated segments: call the `detect_languages_batch` MCP tool per target language with `items` of `{id, text: <target>, sourceText: <source>, isUiText}` (≤500 per call; `isUiText` is true for labels, buttons and menus, left out when unknown) and `keepTerms` (the `keep` list, character names, and glossary terms whose target equals the source). `untranslated` is a finding to fix or accept; `unsure` and `skipped` are listed for review, not failures; count `kept_term` separately. Log each result in `tools/untranslated_check.jsonl`
 
 Add the checks listed under "QA emphasis" in the project's flow — games: short UI expanded by more than 30% and an unused resolved formality marker are findings; edtech: option count, order and correct-option marker unchanged, feedback agrees; fintech: digits and currency codes match, locked statuses use the glossary term, a weaker disclaimer is a finding (never an automatic rewrite); saas: ICU/placeholder validity, help articles use the translated button labels. Also check that `resolved` facts were honored and unresolved ones weren't committed to (unless tagged `agent-choice` or `provisional`).
 
@@ -322,7 +322,7 @@ Apply only user-approved edits. Re-run 4.1's local QA on the edited rows — not
 After each batch:
 - Row range and languages processed
 - QA findings by type and count
-- Untranslated check per target language: untranslated (fixed / accepted / open), unsure and skipped counts
+- Untranslated check per target language: untranslated (fixed / accepted / open), unsure, kept-term and other skipped counts
 - Fluency self-check per the setting: "not measured (project setting)" for `none`; the context-free baseline (min, mean, any below 6) labeled as pre-glossary; for the context-aware score, a table `string id | fluency2 | fluencyScore-ctx | decision | reason` for flagged strings, counts per decision, and the document notes; terminology HIT/MISS/UNSURE counts; strings tagged `agent-choice`/`provisional` (not locks); unscored and "revised after scoring" strings
 - Context: coverage per section, screenshot coverage, open facts per language, and the top client questions (pointer to `client_questions.md`)
 - Edits applied
