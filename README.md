@@ -54,6 +54,10 @@ During onboarding the agent asks which fluency checks to run, and records the an
 
 Scores land in `fluency_report.csv`. They are a self-check of the agent's own translation, not an independent review.
 
+### Using a project created in the platform
+
+If you created the project in the Algebras platform first (name, type, languages, optional glossary), add `Project id: <id>` to the prompt. The agent reads that project before anything else. If it already has strings, the agent works from them. If it's empty, the agent finds the strings in your repo and imports them into that project. Either way it uses the project's languages and glossary, tells you where your files disagree with them, and never creates a second project.
+
 ### Prepare your project folder
 
 Put any brief, style guide, character list, glossary, or screenshots in the project folder next to the translation files. Any file name is fine — the agent classifies files by their contents. What to include, and which facts each target language forces, is in [`plugin/CONTEXT_REQUIREMENTS.md`](plugin/CONTEXT_REQUIREMENTS.md). Missing context doesn't block translation: the agent asks at most five questions and writes the rest to `client_questions.md` for you to forward to the client.

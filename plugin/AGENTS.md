@@ -16,7 +16,7 @@ The agent is format-agnostic. Do not assume any particular file extension, colum
 - **If skill invocation is available in this session** (you can see `algebras-agent:onboard`, `algebras-agent:glossary`, `algebras-agent:translate`, `algebras-agent:qa` in your skill list): invoke the skill for the phase you're on. Each skill checks its own prerequisites first and tells you where to go if they aren't met — don't skip ahead manually.
 - **If skill invocation isn't available** (e.g. Cursor, Windsurf, or a Claude Code/Codex session without the `algebras-agent` plugin installed): open and follow the corresponding file in full, in order — `skills/onboard/SKILL.md` → `skills/glossary/SKILL.md` → `skills/translate/SKILL.md` → `skills/qa/SKILL.md`. Each file contains the same phase content and prerequisite checks as the skill; treat it as the skill's body.
 
-Start at `onboard` for a new project. If `project.json` already exists and is complete, `onboard` will tell you to skip ahead.
+Start at `onboard` for a new project. If `project.json` already exists and is complete, `onboard` will tell you to skip ahead. If the user gives an existing platform project id, `onboard` reads that project first and uses it — its strings, or the repo's strings imported into it — with the project's languages and glossary, reporting any difference with the files instead of overwriting the project, and never creating a second one.
 
 ## Project types
 

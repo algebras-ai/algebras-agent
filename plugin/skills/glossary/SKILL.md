@@ -1,7 +1,7 @@
 ---
 name: glossary
 description: Phase 2 of the Algebras translation workflow (Glossary Bootstrap) — extract candidate terms, research established translations, and create a validated glossary on the Algebras platform. Requires a completed project.json from the onboard phase.
-allowed-tools: [Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__list_glossaries, mcp__algebras__create_glossary, mcp__algebras__get_glossary, mcp__algebras__create_glossary_term, mcp__algebras__bulk_create_glossary_terms, mcp__algebras__list_glossary_terms, mcp__algebras__list_glossary_term_types, mcp__algebras__create_glossary_term_type, mcp__algebras__set_glossary_term_status]
+allowed-tools: [mcp__algebras__import_project, Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__list_glossaries, mcp__algebras__create_glossary, mcp__algebras__get_glossary, mcp__algebras__create_glossary_term, mcp__algebras__bulk_create_glossary_terms, mcp__algebras__list_glossary_terms, mcp__algebras__list_glossary_term_types, mcp__algebras__create_glossary_term_type, mcp__algebras__set_glossary_term_status]
 ---
 
 # Phase 2 — Glossary Bootstrap
@@ -21,7 +21,7 @@ If `project.json`'s `glossary_id` is already set, call `get_glossary` with it an
 If `glossary_id` is `null`:
 1. `list_glossaries` is paginated (50 per page by default) and each glossary in the response carries its full terms — don't assume the first page is the whole org. Page through it (`page: 1, 2, 3, ...`) checking each page for a name match against this project, and stop as soon as you find one or as soon as `pagination.totalPages` is exhausted. Cap it at 20 pages (1,000 glossaries) — if you haven't found a match by then, stop and ask the user rather than continuing to page indefinitely.
 2. If a glossary already exists whose name matches this project (e.g. from an earlier session that didn't save it back to `project.json`), offer to reuse it instead of creating a duplicate.
-3. Otherwise call `create_glossary` with a name derived from the project (e.g. `project.json`'s `name`) and `languages` set to `source_lang` plus every `target_langs` entry.
+3. Otherwise call `create_glossary` with a name derived from the project (e.g. `project.json`'s `name`) and `languages` set to `source_lang` plus every `target_langs` entry. When `project.json` has a `project_id`, link the new glossary to that project: `import_project` with `projectId` and `glossaryId` only.
 4. Write the returned glossary `id` into `project.json`'s `glossary_id` immediately, so a crash or restart doesn't orphan it.
 
 Report the result: "Glossary `<name>` (`<id>`) — `<N>` existing terms" (or "0 — empty, ready for bootstrapping").

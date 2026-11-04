@@ -15,7 +15,10 @@ The agent is format-agnostic. Do not assume any particular file extension, colum
 
 ## 1.0 Project type
 
-**Platform-only project.** If the working directory has no translation files and the user names an existing Algebras platform project (by id or name), the platform already holds the strings and their context. Read it with `get_project_context` and `list_strings`, write a `project.json` with its `project_id`, source and target languages, and the glossary id the project links to, skip 1.1–1.4 and 1.6, ask 1.2d if `fluency` isn't set, and show the 1.5 summary from what the platform returned. Translations are then written back to the files the user points to, or the user is asked where they go.
+**Existing platform project.** People can create a project in the Algebras platform (name, type, languages, optional glossary) and pass its id to the agent. When the user gives a project id (or names a project), read it first: `get_project_context` for the project's `name`, `type`, `sourceLang`, `targetLangs`, `glossaryId` and context, and `list_strings` for its strings. Record the id as `project.json`'s `project_id` — this project is the one the run uses; never create a second one. Then:
+
+- **The project has strings and the working directory has no translation files** — the platform already holds the strings and their context. Write a `project.json` with its `project_id`, source and target languages, and the glossary id the project links to, skip 1.1–1.4 and 1.6, ask 1.2d if `fluency` isn't set, and show the 1.5 summary from what the platform returned. Translations are then written back to the files the user points to, or the user is asked where they go.
+- **The project has no strings, or the user has local files to add to it** — run 1.1–1.4 as usual, then import into this project in 1.6 (see "Importing into an existing project" there). Take `source_lang`, `target_langs` and `glossary_id` for `project.json` from the project, not from the files; take `project_type` from the project's `type` unless the user declared one (`GAME` → `games`; `APP_UI` → `saas`, or `fintech` when the files are a payments, banking or insurance product; anything else → infer in 1.2a). Compare them with what the files show — a source language that differs, a target language the files have that the project lacks or the reverse, a glossary the files' client glossary would contradict — and tell the user about each difference in the 1.5 summary. Never change the project's settings to match the files without the user's OK; they can change them in the platform or tell you to.
 
 Check whether the user declared a project type — e.g. `Project type: saas` or "Use the games flow" in their prompt. Valid types: `games`, `edtech`, `fintech`, `saas`, `general`. If none was declared, don't ask: 1.2a infers it from the strings, falling back to `general`.
 
@@ -154,7 +157,7 @@ Write `project.json` based on what you've discovered. Do not copy a template —
 
 The context fields come from 1.1 and 1.2b. `context_files` is keyed by section — `glossary`, `history`, `universe`, `tone_of_voice`, `social_graph`, `screenshots`, `integrations`, `files` — with `[]` when a section has no file. `context_coverage` stores `present`, `partial`, `missing` or `not_needed` per section. `screenshot_coverage` is a fraction from 0.0 to 1.0. `file_flows` maps a translation file to its flow when `project_type` is `general`; otherwise it is `{}`.
 
-`project_id` stays `null` here — 1.6 imports the project to the Algebras platform and fills it in. On a platform-only project (1.0) it is the id of the project the user named.
+`project_id` stays `null` here — 1.6 imports the project to the Algebras platform and fills it in. When the user gave an existing project (1.0), it is that project's id from the start, and `source_lang`, `target_langs` and `glossary_id` are the project's.
 
 `glossary_id` stays `null` here — the `glossary` skill (Phase 2) creates the glossary on the Algebras platform and fills this in. There is no local glossary directory or file to set up.
 
@@ -183,6 +186,8 @@ Import the project into the Algebras platform, which holds its context from now 
 
 Generate `tools/platform_import.py` (generic: reads `project.json`, `context_pack.json` and `context_facts.jsonl`, prints the payload as JSON) if `tools/` doesn't have it, and check its output on a few strings with every status before sending the full set.
 
+**Importing into an existing project** (a `project_id` the user gave, or one from an earlier run): pass it as `projectId`, and leave out `name`, `type`, `sourceLang`, `targetLangs` and `glossaryId` — the import overwrites the project's settings with any of them you send, and the project's settings win (see 1.0). Send one only when the user asked to change it. If the project already has context (`get_project_context` returned a non-empty `context.data`), leave `context` out of the import too — it replaces the whole project context — and add the local project facts with `update_project_context` and the context's `version` as `baseVersion` (`CONTEXT_REQUIREMENTS.md`, "Writes"), keeping what the platform already holds; a fact that disagrees with the platform's is a `conflict`, not an overwrite.
+
 Call `import_project` with the payload. If `project.json` already has a `project_id`, pass it: the import then updates that project, matching strings by `externalKey`, so re-running 1.6 after a change to the files updates the same strings instead of creating new ones. Send large projects in chunks of about 200 strings per call (pass the `project_id` from the first call to the rest). Write the returned `project_id` into `project.json` right after the first call, so a crash doesn't orphan the project.
 
 Then read it back: `get_project_context`, and `list_strings` for the string count, the `flagged` count and, per target language, the strings with missing facts. Compare them with the local counts from 1.2b and report any difference to the user before 1.5. Translate and QA read context from the platform from here on.
@@ -196,6 +201,7 @@ Run 1.6 first, so the summary reports what the platform holds. Before any transl
 > - Content: [what is being translated — e.g. "RPG game — UI labels, VO lines, lore, achievements"]
 > - Source: [language] · [field/column] · [file(s)]
 > - Targets: [list of target languages]
+> - Platform project: [new / existing `<name>` (`<id>`)] [· each difference between the project's settings and the files — source language, target languages, glossary — and that the project's settings are used]
 > - Existing translations: [per language: N of M segments already translated — kept, not re-translated]
 > - Context: [one line per present or partial section — section, status, source file; "no client context files found" if none] · screenshot coverage [N%]
 > - Platform project: [project_id] · [N strings] · [M flagged] — context is read from and written to the platform from here on

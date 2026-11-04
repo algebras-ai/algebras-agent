@@ -144,6 +144,8 @@ If no type is given, onboarding infers it from the strings and falls back to `ge
 
 If the prompt has a `Fluency: none|isolated|context|both` line, onboarding uses it; otherwise onboarding asks once which fluency checks to run.
 
+If the prompt names an existing Algebras platform project — e.g. a `Project id: <id>` line, for a project created in the platform UI — onboarding reads that project first and uses it: its strings if it already has them, otherwise it imports the repo's strings into it. The project's source and target languages and glossary are used, differences with the files are reported to the user, and no second project is created.
+
 ## Step 5 — Run the workflow
 
 Run the four phases in order, each in full: **Onboard → Glossary → Translate → QA**. Each phase has user-confirmation gates (project summary and fluency setting, glossary approval, branch and commit) — stop and wait for the user at each one; don't skip them to finish faster.
