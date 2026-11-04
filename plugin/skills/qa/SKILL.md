@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Phase 4 of the Algebras translation workflow (QA Review) — local QA with the project flow's checks, full-corpus terminology consistency, reading the fluency scores captured during translation (context-free baseline and/or context-aware decisions, no new calls), reviewer-agent proofreading, and the context report. Requires at least one batch already translated and written to disk.
-allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__detect_languages_batch, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__get_project_context, mcp__algebras__list_strings]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, Agent, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__detect_languages_batch, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__get_project_context, mcp__algebras__list_strings, mcp__algebras__record_translations, mcp__algebras__set_translation_status, mcp__algebras__list_translations]
 ---
 
 # Phase 4 — QA Review
@@ -121,7 +121,7 @@ Reviewer agents must not edit files. They report findings in this format:
 
 Include in the approval table: high-confidence `definite_fix` findings, repeated pattern fixes, QA failures, `needs_user_decision` items. Reject: purely subjective rewrites, suggestions that break tags/placeholders/numbers, suggestions that ignore context columns.
 
-Apply only user-approved edits. Re-run 4.1's local QA and 4.2's consistency checks on the edited rows — not fluency; an edited string keeps its original scores rather than getting new ones. Set `"revised_after_scoring": true` on its `tools/fluency_scores.jsonl` line and regenerate `fluency_report.csv`. Report results.
+Apply only user-approved edits, and record each edited string (the `translate` skill's 3.3a): `origin: "machine"` when the wording came from you or a reviewer agent, `origin: "manual"` when it is the user's own wording (that records it as approved). Re-run 4.1's local QA and 4.2's consistency checks on the edited rows — not fluency; an edited string keeps its original scores rather than getting new ones. Set `"revised_after_scoring": true` on its `tools/fluency_scores.jsonl` line and regenerate `fluency_report.csv`. Report results.
 
 ## 4.5 Final report
 
@@ -144,7 +144,27 @@ After each batch:
 - Edits applied
 - Remaining issues for user review
 
-## 4.6 Deliver on the branch
+## 4.6 Review translations
+
+Translation memory reuses only approved translations, and every string written this run is a draft on the platform until someone approves it (the `translate` skill's 3.3a). When the user is done with this run's batches, offer to review the drafts here; they can also review them in the Algebras platform's review screen instead. Skip this step when running non-interactively in CI — the drafts stay drafts.
+
+1. Call `list_translations` with `project.json`'s `project_id`, `status: "draft"` and one target language at a time, following the cursor to the end.
+2. Show the drafts as a table, in pages of about 50 rows:
+
+   | # | string | source | draft | approved now | QA notes |
+   |---|---|---|---|---|---|
+
+   `approved now` is the string's current approved translation, if any. `QA notes` are this run's open or accepted findings for the string (4.1–4.4).
+
+   **Actions**: Approve all on this page / Approve rows (list the numbers) / Edit a row (reply with the number and your wording) / Reject rows / Leave as draft
+3. Apply exactly what the user said:
+   - **approved** rows — `set_translation_status` with the revision ids and `status: "approved"`. Never approve a row the user didn't approve; "approve all" covers only the page shown.
+   - **edited** rows — the user's own wording: write it to the file with the parser, re-run 4.1's checks on it, and record it with `record_translations`, `origin: "manual"`, which the platform stores as approved. Wording you or a reviewer proposed and the user accepted is `origin: "machine"` and stays a draft until approved.
+   - **rejected** rows — `set_translation_status` with `status: "rejected"`. Ask whether to re-translate them (a step-3 fix, recorded as a new draft) or leave the file text for the user.
+   - everything else stays a draft.
+4. Report per target language: drafts shown, approved, edited (manual), rejected, left as draft.
+
+## 4.7 Deliver on the branch
 
 When the user is done with this run (no more batches to translate now), and the work is on a git branch (see the `translate` skill's 3.0; skip this step when running non-interactively in CI — the action commits itself):
 
@@ -154,4 +174,4 @@ When the user is done with this run (no more batches to translate now), and the 
 
 ## Next
 
-This is the last phase for the current batch/scope. To translate another batch, go back to the `translate` skill (3.1). Otherwise, finish with 4.6 — this pipeline run is complete.
+This is the last phase for the current batch/scope. To translate another batch, go back to the `translate` skill (3.1). Otherwise, finish with 4.6 and 4.7 — this pipeline run is complete.

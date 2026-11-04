@@ -128,4 +128,4 @@ These are the localization context sources the agent assembles during onboard, g
 
 ## Delivery
 
-When the project is a git repository, the agent works on its own branch (`algebras/localize-<YYYYMMDD>`, created in translate 3.0) and commits the result at the end of QA (qa 4.6) so the user can review it like any other change. It never pushes or opens a pull request unless the user asks.
+When the project is a git repository, the agent works on its own branch (`algebras/localize-<YYYYMMDD>`, created in translate 3.0) and commits the result at the end of QA (qa 4.7) so the user can review it like any other change. It never pushes or opens a pull request unless the user asks.

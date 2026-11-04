@@ -1,7 +1,7 @@
 ---
 name: translate
 description: Phase 3 of the Algebras translation workflow (Translation) — check each batch for ambiguity (resolved/open/conflict facts), reuse matching translations from translation memory, translate only the misses via the Algebras MCP tools with the glossary and resolved facts, measure fluency as the project's setting says (context-free on a no-glossary translation, context-aware on the written text with neighbors and locks, both, or none), run a mid-batch consistency check against everything already translated, and fix glossary misses in one final glossary pass after all batches. Requires a completed project.json and a confirmed glossary.
-allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__set_glossary_term_status, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__lookup_translation_memory, mcp__algebras__get_project_context, mcp__algebras__update_project_context, mcp__algebras__list_strings, mcp__algebras__get_string_context, mcp__algebras__update_string_contexts, mcp__algebras__list_context_changes]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__set_glossary_term_status, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__lookup_translation_memory, mcp__algebras__record_translations, mcp__algebras__get_project_context, mcp__algebras__update_project_context, mcp__algebras__list_strings, mcp__algebras__get_string_context, mcp__algebras__update_string_contexts, mcp__algebras__list_context_changes]
 ---
 
 # Phase 3 — Translation
@@ -39,7 +39,7 @@ Before writing the first translation of the session, set up where the work will 
 3. **Not a git repository:** count the total source segments across all files to be translated. If there are **more than 2,000**, propose running `git init` — do not run it silently. Explain why: a baseline makes any future mid-batch tooling issue or bad edit trivially recoverable via `git diff` / `git checkout`. For smaller projects, skip git entirely — a small file doesn't need git ceremony.
 4. **Large projects (more than 2,000 source segments):** once a repo exists (new or pre-existing), propose committing the current pre-translation state as a baseline checkpoint (e.g. `git commit -m "pre-translation baseline"`), with the same confirmation and uncommitted-changes rules as step 2.
 
-The `qa` skill's 4.6 commits the result on this branch at the end.
+The `qa` skill's 4.7 commits the result on this branch at the end.
 
 ## 3.1 State rules before each batch
 
@@ -97,7 +97,7 @@ Before step 1, look up the batch in translation memory and reuse earlier transla
 - `targetLanguage`.
 - `glossaryId` — `project.json`'s `glossary_id` (omit it when the project has no glossary).
 
-Each text comes back with `match: null` (a miss) or a match carrying `output`, `review`, `glossaryId`, `createdAt`, `translationType`, `contextNote`, `apiKey.name` and its id (`historyId`, or the revision id for an approved match).
+Approved matches are translations people approved in review — in the platform's review screen or the `qa` skill's 4.6. Each text comes back with `match: null` (a miss) or a match carrying `output`, `review`, `glossaryId`, `createdAt`, `translationType`, `contextNote`, `apiKey.name` and its id (`historyId`, or the revision id for an approved match).
 
 **Glossary filter.** Use an `unreviewed` match only when its `glossaryId` equals `project.json`'s `glossary_id` (both empty when the project has no glossary). Step 1's no-glossary throwaway translations are stored in translation history too — the filter keeps them out. Treat a match that fails the filter as a miss and log it as `rejected-glossary`.
 
@@ -171,6 +171,16 @@ For credits: translate roles and departments; preserve person names, company nam
 Use the parser from Phase 1 to write results. Write only step 3's (glossary-applied) output — never step 1's throwaway translation. Write only the target language field/column for the requested rows. Never overwrite source text or other columns. If no suitable tool exists, generate one before writing.
 
 Verify the exact edited cells by parsing the file again after writing.
+
+## 3.3a Record the written translations
+
+Every translation written to a file is also recorded on the platform project as a draft for review, so people can approve it in the platform's review screen or in the `qa` skill's 4.6, and translation memory reuses it once approved. After writing a chunk, call `record_translations` with `project.json`'s `project_id` and one item per written string: `{ "externalKey": "<file>#<id>", "language": "<target>", "text": "<the written text>", "origin": "machine" }` — the `externalKey` onboard 1.6 imported the string with. Chunk the calls to the tool's item limit.
+
+- This covers TM matches too. The one exception is an approved match that already is this string's own approved translation — recording it again would only add a duplicate draft.
+- A step-3 fix (a re-translated failed TM draft or a broken placeholder) and a 3.5 fix are recorded the same way after they're written; the new draft replaces the string's earlier draft.
+- `origin` is always `machine` here. `manual` is only for the user's own wording, in the `qa` skill's 4.6.
+- Recording never approves. Approve only in 4.6, after the user's explicit OK.
+- An item the platform can't match to a string (not imported yet) comes back as an error: report it and re-run onboard 1.6 for its file, then record it again.
 
 ## 3.3b Step 4 — context-aware fluency (`context`, `both`)
 
@@ -272,7 +282,7 @@ Run once, after the last batch of the session (3.1–3.4 done for every batch), 
 `status`: `ok` (no MISS), `miss` (not fixed yet), `fixed`, `accepted` (a false positive — `reason` says why), `user` (waiting on or decided by the user). The pass is resumable: skip strings whose `status` is `ok`, `fixed`, `accepted` or `user`, and continue from the rest.
 
 1. **Before.** For each string in scope without a `before` record (3.4 already recorded most of them), call `count_glossary_terms` with `project.json`'s `glossary_id`, `sourceLanguage`, `sourceText`, `targetLanguage` and `targetText`. A MISS is `sourceCount > 0` and `targetCount == 0` for a term in the `terms` array.
-2. **Fix each MISS.** Re-translate the string with `translate_text`, with `glossaryId` and without `fluency`, and a `prompt` naming the approved forms of the missing terms. Verify tags, placeholders, numbers and `resolved` facts as in 3.2, write it with the parser (3.3), then call `count_glossary_terms` again and record `after` and `status`. Strings with the same source text are fixed together so Method A stays consistent. Don't re-score fluency: set `"revised_after_scoring": true` on the string's `tools/fluency_scores.jsonl` line.
+2. **Fix each MISS.** Re-translate the string with `translate_text`, with `glossaryId` and without `fluency`, and a `prompt` naming the approved forms of the missing terms. Verify tags, placeholders, numbers and `resolved` facts as in 3.2, write it with the parser (3.3), record it (3.3a), then call `count_glossary_terms` again and record `after` and `status`. Strings with the same source text are fixed together so Method A stays consistent. Don't re-score fluency: set `"revised_after_scoring": true` on the string's `tools/fluency_scores.jsonl` line.
    - A string written from an `approved` TM match is never overwritten — set `status: "user"` and list it for the user.
    - If a fixed string still misses the term, read it: an inflection, word order or homograph the counter didn't recognize is `accepted` with a reason; anything else goes to the user.
 3. **Compliance.** Per target language, before and after the fixes: strings with at least one glossary term in the source, strings with a MISS, the share of strings without a MISS (%), and term occurrences found in the target out of those in the source (count and %). Write it to `tools/glossary_compliance.json` and show it as a table:
