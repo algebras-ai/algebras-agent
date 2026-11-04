@@ -23,7 +23,7 @@ const JSONKEY = { file: "src/i18n/en.json", id: "settings.audio.title" };
 const CSV = { file: "data/strings.csv", id: "17" };
 const XML = { file: "app/src/main/res/values/strings.xml", id: "button_continue" };
 
-const hit = (s, lang, action, review = "unreviewed") => ({ ...s, targetLang: lang, action, review });
+const hit = (s, lang, action) => ({ ...s, targetLang: lang, action });
 const call = (step, lang, strings, extra = {}) => ({
   step,
   tool: "translate_batch",
@@ -87,16 +87,12 @@ test("a retranslated hit may go to a fix call but not to a batch step", () => {
   assert.equal(findLeaks(hits, [call("3", "pt-BR", [JSONKEY])]).length, 1);
 });
 
-test("rejected-glossary hits are misses and may be translated", () => {
-  assert.deepEqual(findLeaks([hit(XML, "tr", "rejected-glossary")], [call("1", "tr", [XML]), call("3", "tr", [XML])]), []);
-});
-
-test("the final glossary pass may fix an unreviewed match but never an approved one", () => {
+test("the final glossary pass may fix a retranslated match but never one written as is", () => {
   const fix = (s) => call("3.5", "de", [s], { tool: "translate_text" });
-  assert.deepEqual(findLeaks([hit(PO, "de", "written")], [fix(PO)]), []);
-  const leaks = findLeaks([hit(PO, "de", "written", "approved")], [fix(PO)]);
+  assert.deepEqual(findLeaks([hit(PO, "de", "retranslated")], [fix(PO)]), []);
+  const leaks = findLeaks([hit(PO, "de", "written")], [fix(PO)]);
   assert.equal(leaks.length, 1);
-  assert.match(leaks[0].reason, /approved/);
+  assert.match(leaks[0].reason, /written match/);
 });
 
 test("record and review calls are not translate calls", () => {
@@ -109,7 +105,7 @@ test("record and review calls are not translate calls", () => {
 
 test("a written string without a record call is caught", () => {
   const result = checkRecording(
-    [hit(PO, "de", "written")],
+    [hit(PO, "de", "retranslated")],
     [call("3", "de", [JSONKEY, CSV]), record("de", [PO, JSONKEY])]
   );
   assert.equal(result.written, 3);
@@ -118,8 +114,8 @@ test("a written string without a record call is caught", () => {
   assert.match(result.unrecorded[0], /strings\.csv/);
 });
 
-test("an unrecorded approved TM match is listed separately, not as a failure", () => {
-  const result = checkRecording([hit(XML, "tr", "written", "approved")], []);
+test("an unrecorded TM match written as is is listed separately, not as a failure", () => {
+  const result = checkRecording([hit(XML, "tr", "written")], []);
   assert.deepEqual(result.unrecorded, []);
   assert.equal(result.approvedNotRecorded.length, 1);
 });

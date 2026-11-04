@@ -124,17 +124,14 @@ export function summarizeTmHits(tmHits) {
   const byLang = {};
   for (const hit of lastByKey(tmHits).values()) {
     bump(byLang, hit.targetLang, "action", hit.action ?? "unknown");
-    bump(byLang, hit.targetLang, "review", hit.review ?? "unknown");
   }
   return byLang;
 }
 
 // A TM-hit string may reach a translate call only when it has to:
-// - `rejected-glossary` hits are misses and are translated like any miss;
 // - `retranslated` hits get a single-string step-3 fix (`fix`) and may be
 //   fixed again in the final glossary pass (`3.5`);
-// - `written` unreviewed hits may be fixed in the final glossary pass;
-// - `written` approved hits never go to a translate call.
+// - `written` hits never go to a translate call.
 export function findLeaks(tmHits, calls) {
   const hits = lastByKey(tmHits);
   const leaks = [];
@@ -146,10 +143,9 @@ export function findLeaks(tmHits, calls) {
       if (!hit) continue;
       let reason = null;
       if (hit.action === "written") {
-        if (hit.review === "approved") reason = "approved match sent to translation";
-        else if (step !== "3.5") reason = "written match sent to translation";
+        reason = "written match sent to translation";
       } else if (hit.action === "retranslated") {
-        if (step !== "fix" && step !== "3.5") reason = "failed draft sent in a batch step";
+        if (step !== "fix" && step !== "3.5") reason = "failed match sent in a batch step";
       }
       if (reason) leaks.push({ key, step, tool: call.tool, reason });
     }
@@ -159,9 +155,9 @@ export function findLeaks(tmHits, calls) {
 
 // Written strings: TM matches written as is or re-translated, and every
 // string in a step-3, fix or 3.5 call. Each must appear in a
-// record_translations call. An approved TM match that is already the
-// string's own approved translation is not recorded again, so unrecorded
-// approved matches are listed separately and don't fail the check.
+// record_translations call. A TM match that is already the string's own
+// approved translation is not recorded again, so unrecorded matches written
+// as is are listed separately and don't fail the check.
 export function checkRecording(tmHits, calls) {
   const hits = lastByKey(tmHits);
   const written = new Set();
@@ -181,7 +177,7 @@ export function checkRecording(tmHits, calls) {
   for (const key of written) {
     if (recorded.has(key)) continue;
     const hit = hits.get(key);
-    if (hit?.action === "written" && hit.review === "approved") approvedNotRecorded.push(key);
+    if (hit?.action === "written") approvedNotRecorded.push(key);
     else unrecorded.push(key);
   }
   const byLang = {};
@@ -365,10 +361,10 @@ export function toMarkdown(report, details = false) {
   const tmLangs = Object.keys(report.tmHits).sort();
   if (!tmLangs.length) lines.push("No TM hits.", "");
   else {
-    lines.push("| lang | written | retranslated | rejected-glossary | approved | unreviewed |", "|---|---|---|---|---|---|");
+    lines.push("| lang | written | retranslated |", "|---|---|---|");
     for (const lang of tmLangs) {
-      const { action = {}, review = {} } = report.tmHits[lang];
-      lines.push(`| ${lang} | ${action.written ?? 0} | ${action.retranslated ?? 0} | ${action["rejected-glossary"] ?? 0} | ${review.approved ?? 0} | ${review.unreviewed ?? 0} |`);
+      const { action = {} } = report.tmHits[lang];
+      lines.push(`| ${lang} | ${action.written ?? 0} | ${action.retranslated ?? 0} |`);
     }
     lines.push("");
   }

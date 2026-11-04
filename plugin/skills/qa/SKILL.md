@@ -135,7 +135,7 @@ After each batch:
 - Untranslated check per target language, from `tools/untranslated_check.jsonl`: untranslated (fixed / accepted / open), unsure, skipped as a kept term (`kept_term`), other skipped, and languages not checked
 - Consistency QA: Method A / Method B / glossary-anchored findings — confirmed, false-positive, fixed-inline, and still-open counts
 - Glossary compliance per target language, before and after the `translate` skill's 3.5 (counts and %, from `tools/glossary_compliance.json`), strings still missing a term (`accepted` or `user` in `tools/glossary_pass.jsonl`), glossary gaps (strings whose source has a term with no definition in the target language, from `gaps` in `tools/glossary_pass.jsonl`), glossary candidates pushed or kept local (`tools/glossary_candidates.jsonl`), and glossary terms still `candidate` on the platform (`list_glossary_terms` with `status: "candidate"`) — offer the `glossary` skill's 2.6 approval table for them
-- Translation memory reuse per target language, from `tools/tm_hits.jsonl`: approved matches written, unreviewed matches written, re-translated, and rejected by the glossary filter
+- Translation memory reuse per target language, from `tools/tm_hits.jsonl`: matches written as is and matches re-translated after a failed check
 - The run report: `node tools/run-report.mjs` (the `translate` skill's 3.5 step 5 says where to get it) — TM-hit strings sent to translation (must be 0), written strings not recorded on the platform (must be 0), and whether the compliance numbers match the pass log. Re-run it after 4.6 to include the review outcomes
 - Fluency self-check, per the project's `fluency` setting:
   - `none`: "not measured (project setting)"

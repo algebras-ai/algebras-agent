@@ -78,10 +78,10 @@ tr 20 ok, 4 user; pt-BR 21 ok, 2 fixed, 1 user.
   string's speaker and addressee as its platform context holds them,
   including values the context evaluator suggested. A first attempt that
   passed plain source strings matched only 2 of 12 seeds per language; the
-  translate skill (3.2.0) now passes the stored values.
+  translate skill (3.2.0) passes the stored values.
 - **Glossary gaps.** The counter reports a term with no definition in the
   target language with `targetCount: 0`. The skills (translate 3.4/3.5,
-  qa 4.2) now report it as a glossary gap, not a MISS a re-translation could
+  qa 4.2) report it as a glossary gap, not a MISS a re-translation could
   fix.
 
 ## Platform findings (reported to the platform pane)

@@ -1,7 +1,8 @@
 # Checking a TM-first run
 
 This procedure proves the translation-memory-first flow on a real project:
-strings found in translation memory skip translation, every written
+strings with an approved translation in memory (same source text, speaker and
+addressee) skip translation, every written
 translation is recorded for review, and glossary compliance is reported before
 and after the final glossary pass (`translate` 3.5). It works for any project
 the agent can parse — CSV, PO, JSON, XLIFF, a web or mobile codebase.

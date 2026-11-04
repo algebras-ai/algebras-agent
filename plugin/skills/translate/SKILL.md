@@ -89,21 +89,15 @@ Show the batch's ambiguity table before translating it, in the user's language:
 
 ## 3.2.0 Translation memory lookup
 
-Before step 1, look up the batch in translation memory and reuse earlier translations that fit. Run this after 3.1b — checking a draft needs the batch's `resolved` facts.
+Before step 1, look up the batch in translation memory and reuse translations people approved. Run this after 3.1b, so the lookup uses the participants as they stand after that step's writes.
 
 **Call.** One `lookup_translation_memory` call per batch, chunked to ≤100 texts per call. Pass:
-- `texts` — the batch's source strings. Pass each string's speaker and addressee as its platform context holds them — `speaker.value` and `addressee.value` in the string's context from `list_strings` (session start), whatever their status, since approved translations are stored with those values: `{ "text": "...", "speakerId": "...", "addresseeId": "..." }`, leaving out a field whose value is `null`. A plain string means no speaker and no addressee, and doesn't match an approved translation stored with either.
-- `sourceLanguage` — the explicit source language, never `auto` (rows stored with `auto` don't match an explicit language, and the reverse).
+- `texts` — the batch's source strings, each with its speaker and addressee from the platform string, on every lookup: `{ "text": "...", "speakerId": "...", "addresseeId": "..." }`. Take them from `speaker.value` and `addressee.value` in the string's current `context.data` (session start, refreshed in 3.1, including what 3.1b just wrote), whatever the fact's status, since approved translations are stored with those values. Leave out a field whose value is `null` or that the context doesn't have. A plain string means no speaker and no addressee, and matches only approved translations stored without either.
 - `targetLanguage`.
-- `glossaryId` — `project.json`'s `glossary_id` (omit it when the project has no glossary).
 
-Approved matches are translations people approved in review — in the platform's review screen or the `qa` skill's 4.6. Each text comes back with `match: null` (a miss) or a match carrying `output`, `review`, `glossaryId`, `createdAt`, `translationType`, `contextNote`, `apiKey.name` and its id (`historyId`, or the revision id for an approved match).
+Translation memory holds only translations people approved — in the platform's review screen or the `qa` skill's 4.6 — and matches on the same source text, target language, speaker and addressee. Drafts and rejected translations never match. Each text comes back with `match: null` (a miss) or a match carrying `output`, `revisionId`, `stringId`, `createdAt`, `source` and `actorType`.
 
-**Glossary filter.** Use an `unreviewed` match only when its `glossaryId` equals `project.json`'s `glossary_id` (both empty when the project has no glossary). Step 1's no-glossary throwaway translations are stored in translation history too — the filter keeps them out. Treat a match that fails the filter as a miss and log it as `rejected-glossary`.
-
-**Per match:**
-- `review: "approved"` — a human-approved translation for the same source, speaker and addressee. Check tags `<...>`, placeholders `{...}`, variables and numbers; if they're intact, write it in 3.3 as is. If they're not, treat it like a failed draft below.
-- `review: "unreviewed"` — a draft. Check it like a step-3 result (3.2): tags, placeholders, variables and numbers; speaker intent and addressee (singular/plural); register; the `resolved` facts from 3.1b. Unreviewed matches ignore speaker and context, so a match can come from a different speaker. Write it in 3.3 if it passes. If it doesn't, re-translate that string alone with `translate_text` (with `glossaryId`, no `fluency`) — a step-3 fix, not a new step 1/2.
+**Per match.** Check tags `<...>`, placeholders `{...}`, variables and numbers. If they're intact, write it in 3.3 as is. If they're not, re-translate that string alone with `translate_text` (with `glossaryId`, no `fluency`) — a step-3 fix, not a new step 1/2.
 
 **Only misses go to 3.2.** A string with a TM match is never part of a `translate_batch`/`translate_batch_async` call — not in step 1, not in step 3.
 
@@ -112,10 +106,10 @@ Approved matches are translations people approved in review — in the platform'
 **TM log.** Append one line per matched string to `tools/tm_hits.jsonl`:
 
 ```json
-{"id": "<string/row id>", "file": "<path>", "sourceLang": "en", "targetLang": "de", "sourceText": "...", "review": "unreviewed", "historyId": "<id>", "revisionId": null, "glossaryId": "<id>", "createdAt": "...", "apiKey": "<name>", "action": "written", "reason": null}
+{"id": "<string/row id>", "file": "<path>", "sourceLang": "en", "targetLang": "de", "sourceText": "...", "revisionId": "<id>", "stringId": "<id>", "createdAt": "...", "action": "written", "reason": null}
 ```
 
-`action` is `written` (used as is), `retranslated` (draft failed a check — `reason` says which) or `rejected-glossary` (failed the glossary filter, translated as a miss). Misses aren't logged here.
+`action` is `written` (used as is) or `retranslated` (the match failed a check — `reason` says which). Misses aren't logged here.
 
 **Call log.** Append one line per `translate_batch`, `translate_batch_async`, `translate_text` and `record_translations` call to `tools/translate_calls.jsonl`, so the run can be checked afterwards (3.5's run report):
 
@@ -123,7 +117,7 @@ Approved matches are translations people approved in review — in the platform'
 {"step": "3", "tool": "translate_batch", "targetLang": "de", "glossaryId": "<id>", "origin": null, "strings": [{"id": "<string/row id>", "file": "<path>"}], "time": "<ISO 8601>"}
 ```
 
-`step` is `1` (no-glossary throwaway), `3` (final translation), `fix` (a single-string step-3 fix, including a failed TM draft), `3.5` (final glossary pass) or `record` (3.3a; `origin` is `machine`). The `qa` skill's 4.6 adds `review` lines: `set_translation_status` calls with their `status`, and `record_translations` calls with `origin: "manual"`. `strings` lists the strings the call sent, in the same `id`/`file` form as `tm_hits.jsonl`; `glossaryId` is `null` when the call had none. Log the call when you send it, not only when it succeeds.
+`step` is `1` (no-glossary throwaway), `3` (final translation), `fix` (a single-string step-3 fix, including a TM match that failed its check), `3.5` (final glossary pass) or `record` (3.3a; `origin` is `machine`). The `qa` skill's 4.6 adds `review` lines: `set_translation_status` calls with their `status`, and `record_translations` calls with `origin: "manual"`. `strings` lists the strings the call sent, in the same `id`/`file` form as `tm_hits.jsonl`; `glossaryId` is `null` when the call had none. Log the call when you send it, not only when it succeeds.
 
 ## 3.2 Translate and measure — per the fluency setting
 
@@ -184,8 +178,8 @@ Verify the exact edited cells by parsing the file again after writing.
 
 Every translation written to a file is also recorded on the platform project as a draft for review, so people can approve it in the platform's review screen or in the `qa` skill's 4.6, and translation memory reuses it once approved. After writing a chunk, call `record_translations` with `projectId` (`project.json`'s `project_id`), `source: "translate"` and one item per written string: `{ "externalKey": "<file>#<id>", "language": "<target>", "text": "<the written text>", "origin": "machine" }` — the `externalKey` onboard 1.6 imported the string with. At most 500 items per call.
 
-- This covers TM matches too. The one exception is an approved match that already is this string's own approved translation — recording it again would only add a duplicate draft.
-- A step-3 fix (a re-translated failed TM draft or a broken placeholder) and a 3.5 fix are recorded the same way after they're written; the new draft replaces the string's earlier draft.
+- This covers TM matches too. The one exception is a match whose `stringId` is this string: it already is this string's approved translation, and recording it again would only add a duplicate draft.
+- A step-3 fix (a TM match that failed its check or a broken placeholder) and a 3.5 fix are recorded the same way after they're written; the new draft replaces the string's earlier draft.
 - `origin` is always `machine` here. `manual` is only for the user's own wording, in the `qa` skill's 4.6.
 - Recording never approves. Approve only in 4.6, after the user's explicit OK.
 - An item the platform can't match to a string (not imported yet) comes back as an error: report it and re-run onboard 1.6 for its file, then record it again.
@@ -291,7 +285,7 @@ Run once, after the last batch of the session (3.1–3.4 done for every batch), 
 
 1. **Before.** For each string in scope without a `before` record (3.4 already recorded most of them), call `count_glossary_terms` with `project.json`'s `glossary_id`, `sourceLanguage`, `sourceText`, `targetLanguage` and `targetText`. A MISS is `sourceCount > 0` and `targetCount == 0` for a term in the `terms` array that has a target term; a term with `targetTerm: null` goes to `gaps` (as in 3.4).
 2. **Fix each MISS.** Re-translate the string with `translate_text`, with `glossaryId` and without `fluency`, and a `prompt` naming the approved forms of the missing terms. Verify tags, placeholders, numbers and `resolved` facts as in 3.2, write it with the parser (3.3), record it (3.3a), then call `count_glossary_terms` again and record `after` and `status`. Strings with the same source text are fixed together so Method A stays consistent. Don't re-score fluency: set `"revised_after_scoring": true` on the string's `tools/fluency_scores.jsonl` line.
-   - A string written from an `approved` TM match is never overwritten — set `status: "user"` and list it for the user.
+   - A string written from a TM match is never overwritten — set `status: "user"` and list it for the user.
    - If a fixed string still misses the term, read it: an inflection, word order or homograph the counter didn't recognize is `accepted` with a reason; anything else goes to the user.
 3. **Compliance.** Per target language, before and after the fixes: strings with at least one glossary term in the source, strings with a MISS, the share of strings without a MISS (%), and term occurrences found in the target out of those in the source (count and %). Write it to `tools/glossary_compliance.json`, keyed by target language:
 
