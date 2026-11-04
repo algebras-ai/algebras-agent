@@ -186,7 +186,7 @@ Do not create a glossary term until the user accepts it. Terms with low confiden
 
 ### 2.5 Create the terms
 
-Each accepted row becomes one glossary term with one `definitions[]` entry per language (`language`, `term` = the rendering in that language, `definition` = a short language-neutral gloss reused across languages). Push accepted rows from this session in one `bulk_create_glossary_terms` call against `glossary_id` (or `create_glossary_term` for a single term added mid-translation). Check the response for partial failures and surface them to the user — the platform enforces the schema on write, so there's no separate local validation step.
+Each accepted row becomes one glossary term with one `definitions[]` entry per language (`language`, `term` = the rendering in that language, `definition` = a short language-neutral gloss reused across languages, `caseSensitivity` = `ignore` for ordinary words, `capitals` for names and abbreviations, decided from the term text and never from its type). Push accepted rows from this session in one `bulk_create_glossary_terms` call against `glossary_id` (or `create_glossary_term` for a single term added mid-translation). Check the response for partial failures and surface them to the user — the platform enforces the schema on write, so there's no separate local validation step.
 
 ---
 

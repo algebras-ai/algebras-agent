@@ -181,7 +181,7 @@ Run this after the batch is written, on the written step-3 text. It scores each 
 - **MISS** — no approved form in the target.
 - **UNSURE** — the source word is a short homograph (`Flight`, `Strong`, `Tied`) in a segment that isn't term-only and isn't capitalized mid-sentence.
 
-Match rules: a stem plus a suffix of at most 4 letters for Russian and other heavily inflected languages, at most 3 for German; `*` matches any suffix; each `variants[].term` of the target definition is another approved form, and so is an "also approved: …" note in the definition text of an older term; a multiword term hits when all its stems occur within a 3-token window, in any order. Placeholders are never terms. A **term-only** string (its source is only existing glossary spans) gets **no** step-4 call — record its HIT/MISS only.
+Match rules: a stem plus a suffix of at most 4 letters for Russian and other heavily inflected languages, at most 3 for German; `*` matches any suffix; each `variants[].term` of the target definition is another approved form, and so is an "also approved: …" note in the definition text of an older term; a multiword term hits when all its stems occur within a 3-token window, in any order. Each definition's `caseSensitivity` applies (`ignore`: any case; `capitals`: capitals must match); a term's `type` never changes how it matches. Placeholders are never terms. A **term-only** string (its source is only existing glossary spans) gets **no** step-4 call — record its HIT/MISS only.
 
 **Build the neighbor window.** Same file and target language only, never another translator's text, at most 8 strings. Score each already-translated candidate:
 
@@ -281,7 +281,7 @@ Run once, after the last batch of the session (3.1–3.4 done for every batch), 
    |---|---|---|---|---|---|---|---|
 
    `count_glossary_terms` counts approved terms only, so candidate terms aren't in these numbers.
-4. **Push candidates once.** Show the `status: "local"` lines of `tools/glossary_candidates.jsonl` as a table (term, translation, language, evidence, strings). Push the rows the user accepts with `create_glossary_term`, with the `type` and per-language `gender` when known (see the `glossary` skill's 2.5 for the term shape), and mark each line `pushed` with the returned `termId`; mark rejected rows `rejected`. Pushed terms start as candidates. Then run the `glossary` skill's 2.6 approval table on them: approve with `set_glossary_term_status` only the rows the user approves there. Approved terms count in translation and the glossary check from the next batch or session; this session's written strings stay as they are.
+4. **Push candidates once.** Show the `status: "local"` lines of `tools/glossary_candidates.jsonl` as a table (term, translation, language, evidence, strings). Push the rows the user accepts with `create_glossary_term`, with the `type`, each definition's `caseSensitivity` (the `glossary` skill's 2.5 case mode) and per-language `gender` when known (see 2.5 for the term shape), and mark each line `pushed` with the returned `termId`; mark rejected rows `rejected`. Pushed terms start as candidates. Then run the `glossary` skill's 2.6 approval table on them: approve with `set_glossary_term_status` only the rows the user approves there. Approved terms count in translation and the glossary check from the next batch or session; this session's written strings stay as they are.
 
 ## Next
 

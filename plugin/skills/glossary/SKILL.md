@@ -26,7 +26,7 @@ If `glossary_id` is `null`:
 
 Report the result: "Glossary `<name>` (`<id>`) — `<N>` existing terms" (or "0 — empty, ready for bootstrapping").
 
-Then call `list_glossary_term_types` once and keep the keys it returns: the built-in types (`character`, `item`, `location`, `mechanic`, `ui_label`, `other`) plus the organization's own. Every term gets one of these keys as its `type`. Only built-in keys change how a term is handled (a `character` needs a gender in each gendered target language); the organization's own types are labels for grouping and filtering. If the project's terms need a category none of the keys fits, propose a new type in the 2.4 table — a lowercase snake_case `key` and a `name` — and create it with `create_glossary_term_type` only after the user accepts it; otherwise use `other`.
+Then call `list_glossary_term_types` once and keep the keys it returns: the built-in types (`character`, `item`, `location`, `mechanic`, `ui_label`, `other`) plus the organization's own. Every term gets one of these keys as its `type`. A type is a label for grouping and filtering; it never changes how the glossary counter matches a term. The one rule tied to a built-in key: a `character` needs a gender in each gendered target language. If the project's terms need a category none of the keys fits, propose a new type in the 2.4 table — a lowercase snake_case `key` and a `name` — and create it with `create_glossary_term_type` only after the user accepts it; otherwise use `other`.
 
 ## 2.1b Import the client's glossary
 
@@ -66,22 +66,29 @@ For each candidate term, use web search to find whether an official or widely-us
 
 Present your proposals before creating anything. For terms where you're uncertain (confidence = low), flag them explicitly:
 
-> | # | Source term | Type | Definition | [de] | [fr] | Confidence |
-> |---|---|---|---|---|---|---|
-> | 1 | Dragon Stone | item | Rare magical artifact | Drachenstein (m.) | Pierre du Dragon (f.); also: Pierre de Dragon | high |
-> | 2 | Blink | mechanic | Teleport dash ability | Blinken? | ? | low — please advise |
+> | # | Source term | Type | Case | Definition | [de] | [fr] | Confidence |
+> |---|---|---|---|---|---|---|---|
+> | 1 | Dragon Stone | item | capitals | Rare magical artifact | Drachenstein (m.) | Pierre du Dragon (f.); also: Pierre de Dragon | high |
+> | 2 | Blink | mechanic | ignore | Teleport dash ability | Blinken? | ? | low — please advise |
 >
 > New type proposed: `spell` — "Spell" (rows 4, 9). Accept / use `other` instead
 >
 > **Actions**: Accept all / Edit a row (reply with row number + correction) / Skip a term / Add a term
 
-Show the grammatical gender for each rendering in a gendered language, and the variants after it. A `character` term whose gender is unknown in a gendered target language has low confidence. Do not create a glossary term until the user accepts it. Terms with low confidence must be resolved before translation starts. If the user rejects a suggestion, record the correct form and the reason.
+Show the grammatical gender for each rendering in a gendered language, and the variants after it. `Case` is the case mode from 2.5. A `character` term whose gender is unknown in a gendered target language has low confidence. Do not create a glossary term until the user accepts it. Terms with low confidence must be resolved before translation starts. If the user rejects a suggestion, record the correct form and the reason.
 
 ## 2.5 Create the terms
 
 Each accepted row becomes one glossary term. A new term starts as a `candidate`; 2.6 approves it.
 - `type` — the type key from 2.4.
-- `definitions[]` — one entry per language you have a confirmed rendering for: `language` (code), `term` (the rendering in that language), `definition` (a short, language-neutral gloss of what the term means; reuse the same definition text across languages unless the meaning itself shifts), `gender` for a language with grammatical gender, and `variants` for its other approved forms.
+- `definitions[]` — one entry per language you have a confirmed rendering for: `language` (code), `term` (the rendering in that language), `definition` (a short, language-neutral gloss of what the term means; reuse the same definition text across languages unless the meaning itself shifts), `caseSensitivity`, `gender` for a language with grammatical gender, and `variants` for its other approved forms.
+
+**Case mode.** Set `caseSensitivity` on every definition from the term text itself, never from its `type`:
+- `ignore` — an ordinary word or phrase, including UI labels written in title case (`Save`, `Sound Volume`): any case matches.
+- `capitals` — a name (a character, place, brand, product or named item) or an abbreviation (`HP`, `PvP`): its capitals must match.
+- `exact` or `auto` — only when the user asks (e.g. units like `mW`).
+
+The user can change a term's case mode later with `update_glossary_term`; changing only `caseSensitivity` keeps the term's status.
 
 For the row above:
 
@@ -89,9 +96,9 @@ For the row above:
 {
   "type": "item",
   "definitions": [
-    { "language": "en", "term": "Dragon Stone", "definition": "Rare magical artifact" },
-    { "language": "de", "term": "Drachenstein", "definition": "Rare magical artifact", "gender": "masculine" },
-    { "language": "fr", "term": "Pierre du Dragon", "definition": "Rare magical artifact", "gender": "feminine",
+    { "language": "en", "term": "Dragon Stone", "definition": "Rare magical artifact", "caseSensitivity": "capitals" },
+    { "language": "de", "term": "Drachenstein", "definition": "Rare magical artifact", "caseSensitivity": "capitals", "gender": "masculine" },
+    { "language": "fr", "term": "Pierre du Dragon", "definition": "Rare magical artifact", "caseSensitivity": "capitals", "gender": "feminine",
       "variants": [{ "gender": "feminine", "term": "Pierre de Dragon" }] }
   ]
 }
