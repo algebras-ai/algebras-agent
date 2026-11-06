@@ -49,4 +49,4 @@ Read the changed records (`get_project_context`, `get_string_context`). If this 
 
 ## 5. Finish
 
-Tell the user, per language: translations written, drafts waiting, strings that need a new translation, context changes taken in, and anything you need them to decide. Then run `node tools/platform-sync.mjs --ack`, which empties the inbox. Run it only after everything above is applied, so an interrupted sync stays in the inbox.
+Tell the user, per language: translations written, drafts waiting, strings that need a new translation, context changes taken in, and anything you need them to decide. For drafts waiting, give the link to review them: `<platform>/translation/projects/<project_id>?lang=<target>` (`<platform>` is `ALGEBRAS_PLATFORM_URL`, or `project.json`'s `mcp_url` without `/api/mcp`). Then run `node tools/platform-sync.mjs --ack`, which empties the inbox. Run it only after everything above is applied, so an interrupted sync stays in the inbox.

@@ -77,7 +77,7 @@ Put any brief, style guide, character list, glossary, or screenshots in the proj
 
 ### Working with the platform
 
-The platform project stays in step with your repo. Context, context files, screenshots, draft translations and fluency scores are stored there, and people review them on the project page. When a session starts, and once an hour if you agreed during setup, the agent polls for what they changed and the `sync` skill writes approved text back into your files. Your repo's parser does the writing; if a file has uncommitted changes, the agent asks first.
+The platform project stays in step with your repo. Context, context files, screenshots, draft translations and fluency scores are stored there, and people review them on the project page. When a session starts, and once an hour if you agreed during setup, the agent polls for what they changed and the `sync` skill writes approved text back into your files. Your repo's parser does the writing; if a file has uncommitted changes, the agent asks first. The agent works through the Algebras MCP tools and API; it gives you a link to the project page for review and never drives a browser unless you ask it to.
 
 ## Install
 
@@ -92,7 +92,7 @@ claude plugin marketplace add algebras-ai/algebras-agent
 claude plugin install algebras-agent@algebras-agent
 ```
 
-Then start an interactive session and run the setup skill — it opens your browser for the API key, copies workflow files into your project, and saves the key to `.env`:
+Then start an interactive session and run the setup skill — it gives you a link to get the API key, copies workflow files into your project, and saves the key to `.env`:
 
 ```
 claude
@@ -146,7 +146,7 @@ Run from your project root:
 curl -fsSL https://platform.algebras.ai/install | bash
 ```
 
-The script opens your browser for the API key, downloads the workflow files, and writes the MCP config automatically (`.cursor/mcp.json`, `.windsurf/mcp.json`, or `~/.codex/config.toml`).
+The script gives you a link to get the API key, downloads the workflow files, and writes the MCP config automatically (`.cursor/mcp.json`, `.windsurf/mcp.json`, or `~/.codex/config.toml`).
 
 If your agent isn't auto-detected, pass `--agent` explicitly:
 

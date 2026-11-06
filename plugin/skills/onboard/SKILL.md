@@ -62,7 +62,7 @@ This step never blocks the pipeline. Show one coverage table and at most 5 quest
 
 Status is `present`, `partial`, `missing`, or `not needed for this content type`. `present` means the file covers the facts this content type needs from that section; `partial` means a file was classified there but some of those facts are still open. Count the strings for which that section is the natural source of a language-forced fact or of a disambiguation the source text doesn't contain. Sections not needed for this content type show 0.
 
-**Web product pass.** Once per project, search the product's official site, store page and wiki (see `CONTEXT_REQUIREMENTS.md`, "Web product pass"). Open the page, quote the line that supports a fact, and keep the URL — a search snippet is not evidence. A marketing page that uses du/Sie or tu/vous is a clue; it resolves the address form only when it shows this same UI, or the project has an explicit setting. Two official sources that disagree become a `conflict` with both URLs.
+**Web product pass.** Once per project, search the product's official site, store page and wiki (see `CONTEXT_REQUIREMENTS.md`, "Web product pass"). Read the page, quote the line that supports a fact, and keep the URL — a search snippet is not evidence. A marketing page that uses du/Sie or tu/vous is a clue; it resolves the address form only when it shows this same UI, or the project has an explicit setting. Two official sources that disagree become a `conflict` with both URLs.
 
 The platform project is where context lives (`CONTEXT_REQUIREMENTS.md`, "Where context lives"). The files this step writes are the input for the import in 1.6: they let the intake run and be tested locally before anything is sent.
 
@@ -224,6 +224,7 @@ Run 1.6 first, so the summary reports what the platform holds. Before any transl
 > - Existing translations: [per language: N of M segments already translated — kept, not re-translated]
 > - Context: [one line per present or partial section — section, status, source file; "no client context files found" if none] · screenshot coverage [N%]
 > - Platform project: [project_id] · [N strings] · [M flagged] — context is read from and written to the platform from here on
+> - Review on the platform: `<platform>/translation/projects/<project_id>`
 > - Stored on the platform: [N context files] · [N screenshots] · fields left empty from the prefill checklist and why
 > - Open facts: [unresolved facts per target language, and the single top question — full list in `client_questions.md`]
 > - Fluency checks: [none / isolated / context / both]

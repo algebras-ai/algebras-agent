@@ -2,7 +2,6 @@
 // One-time setup: authenticates with Algebras and saves ALGEBRAS_API_KEY to .env
 
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
-import { execSync } from "child_process";
 import { createInterface } from "readline";
 import { homedir } from "os";
 import { join, dirname } from "path";
@@ -183,13 +182,7 @@ function updateProjectJson() {
 
 async function askApiKey() {
   const apiKeysUrl = `${PLATFORM_URL}/api-keys`;
-  try {
-    if (process.platform === "darwin")      execSync(`open "${apiKeysUrl}"`);
-    else if (process.platform === "win32")  execSync(`start "" "${apiKeysUrl}"`);
-    else                                    execSync(`xdg-open "${apiKeysUrl}"`);
-  } catch {
-    process.stderr.write(`\nOpen this URL to get your API key:\n  ${apiKeysUrl}\n`);
-  }
+  process.stderr.write(`\nGet your API key here:\n  ${apiKeysUrl}\n`);
 
   return new Promise((resolve) => {
     const rl = createInterface({ input: process.stdin, output: process.stderr });

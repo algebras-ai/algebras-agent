@@ -151,7 +151,7 @@ After each batch:
 
 ## 4.6 Review translations
 
-Translation memory reuses only approved translations, and every string written this run is a draft on the platform until someone approves it (the `translate` skill's 3.3a). When the user is done with this run's batches, offer to review the drafts here; they can also review them on the Algebras platform's project page instead; the `sync` skill brings what they approve there back into the files. Skip this step when running non-interactively in CI — the drafts stay drafts.
+Translation memory reuses only approved translations, and every string written this run is a draft on the platform until someone approves it (the `translate` skill's 3.3a). When the user is done with this run's batches, offer to review the drafts here; they can also review them on the platform instead: give them the link `<platform>/translation/projects/<project_id>?lang=<target>` (`<platform>` is `ALGEBRAS_PLATFORM_URL`, or `project.json`'s `mcp_url` without `/api/mcp`). The `sync` skill brings what they approve there back into the files. Skip this step when running non-interactively in CI — the drafts stay drafts.
 
 1. Call `list_translations` with `projectId` (`project.json`'s `project_id`), `language` (one target language at a time) and `status: "draft"`. It is paged: pass `page` (from 1) and `limit` (up to 100), and keep requesting the next page until you have read `total` rows. Each row has the string's `externalKey`, its source text, `draft` and `approved` (each with its revision `id` and `text`, or `null`) and `rejectedCount`.
 2. Show the drafts as a table, in pages of about 50 rows:

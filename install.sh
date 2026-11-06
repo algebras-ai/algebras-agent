@@ -99,13 +99,7 @@ if [[ -n "$api_key" ]]; then
   echo "Using ALGEBRAS_API_KEY from your environment or .env."
 else
   api_keys_url="$PLATFORM_URL/api-keys"
-  if command -v open >/dev/null 2>&1; then
-    open "$api_keys_url"
-  elif command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "$api_keys_url" 2>/dev/null || true
-  else
-    printf '\nOpen this URL to get your API key:\n  %s\n' "$api_keys_url" >&2
-  fi
+  printf '\nGet your API key here:\n  %s\n' "$api_keys_url" >&2
 
   printf '\nPaste your Algebras API key:\n> ' >&2
   IFS= read -r api_key </dev/tty

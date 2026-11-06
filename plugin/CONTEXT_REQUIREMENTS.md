@@ -159,4 +159,4 @@ When sources disagree, the higher one wins:
 
 ## Web product pass
 
-Once per project, during onboard intake, the agent searches the product's official site, store page and wiki. It opens the page and quotes the line that supports a fact, with its URL. A search snippet is not evidence. A marketing page that uses du/Sie or tu/vous is a clue: it resolves the address form only when it shows this same UI, or when the project has an explicit setting. Later, the translate phase searches again only for points that are still `open` or in `conflict` (query: product name plus the string).
+Once per project, during onboard intake, the agent searches the product's official site, store page and wiki. It reads the page and quotes the line that supports a fact, with its URL. A search snippet is not evidence. A marketing page that uses du/Sie or tu/vous is a clue: it resolves the address form only when it shows this same UI, or when the project has an explicit setting. Later, the translate phase searches again only for points that are still `open` or in `conflict` (query: product name plus the string).
