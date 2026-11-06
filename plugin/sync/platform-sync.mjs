@@ -122,6 +122,18 @@ export function diffFiles(previous, items) {
   return { added, changed, removedCount, current };
 }
 
+// Screenshots people uploaded since the last poll. Those carry an `upload#` key;
+// capture runs, including the agent's own, are named after their run.
+export function diffScreenshots(previousIds, items) {
+  const known = new Set(previousIds);
+  return {
+    newCount: items.filter(
+      (shot) => !known.has(shot.id) && shot.externalKey?.startsWith("upload#")
+    ).length,
+    ids: items.map((shot) => shot.id),
+  };
+}
+
 export const emptyInbox = () => ({
   polledAt: null,
   surfacedAt: null,
@@ -231,14 +243,19 @@ export async function poll(dir, { fetchImpl = fetch, now = () => new Date() } = 
   const startedAt = date ? new Date(date).toISOString() : now().toISOString();
 
   const fileList = (await get("/files")).data.items;
-  const shots = (await get("/screenshots", { limit: 1 })).data;
+  const shotList = [];
+  for (let page = 1; ; page++) {
+    const { data } = await get("/screenshots", { page, limit: PAGE_SIZE });
+    shotList.push(...data.items);
+    if (page * data.limit >= data.total) break;
+  }
 
   if (!state) {
     writeJson(statePath, {
       contextVersion: project.contextVersion,
       since: startedAt,
       files: diffFiles({}, fileList).current,
-      screenshots: shots.total,
+      screenshots: shotList.map((shot) => shot.id),
     });
     if (!existsSync(inboxPath)) writeJson(inboxPath, emptyInbox());
     return { baseline: true, inbox: loadInbox(dir) };
@@ -284,19 +301,20 @@ export async function poll(dir, { fetchImpl = fetch, now = () => new Date() } = 
   }
 
   const files = diffFiles(state.files ?? {}, fileList);
+  const shots = diffScreenshots(state.screenshots ?? [], shotList);
   const inbox = mergeInbox(loadInbox(dir), {
     polledAt: startedAt,
     translations,
     context,
     files,
-    newScreenshots: Math.max(0, shots.total - (state.screenshots ?? 0)),
+    newScreenshots: shots.newCount,
   });
   writeJson(inboxPath, inbox);
   writeJson(statePath, {
     contextVersion,
     since: startedAt,
     files: files.current,
-    screenshots: shots.total,
+    screenshots: shots.ids,
   });
   return { inbox };
 }

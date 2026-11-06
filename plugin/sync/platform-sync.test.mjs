@@ -10,6 +10,7 @@ import {
   classifyTranslation,
   cronLine,
   diffFiles,
+  diffScreenshots,
   inboxSize,
   loadInbox,
   mergeCrontab,
@@ -130,6 +131,20 @@ test("file changes count only people's uploads, but any removal", () => {
   assert.equal(result.current.own, "6");
 });
 
+test("only screenshots people uploaded are news", () => {
+  const result = diffScreenshots(
+    ["old"],
+    [
+      { id: "old", externalKey: "upload#a" },
+      { id: "ui", externalKey: "upload#b" },
+      { id: "run", externalKey: "repo#shot.png" },
+      { id: "bare", externalKey: null },
+    ]
+  );
+  assert.equal(result.newCount, 1);
+  assert.deepEqual(result.ids, ["old", "ui", "run", "bare"]);
+});
+
 test("the crontab keeps other lines and holds one line per project", () => {
   const line = cronLine("/work/game", "/usr/bin/node", "/work/game/tools/s.mjs");
   assert.match(line, /--quiet/);
@@ -180,7 +195,8 @@ function fakePlatform(world) {
     } else if (path === "/files") {
       data = { items: world.files ?? [] };
     } else if (path === "/screenshots") {
-      data = { items: [], total: world.shots ?? 0, page: 1, limit: 1 };
+      const items = world.shots ?? [];
+      data = { items, total: items.length, page: 1, limit: 100 };
     } else if (path === "/changes") {
       data = {
         changes: world.changes ?? [],
@@ -217,7 +233,11 @@ test("a poll with no project is a quiet no-op", async () => {
 
 test("the first poll records a baseline; later ones collect people's changes", async () => {
   const dir = projectDir();
-  const world = { version: 5, files: [], shots: 2 };
+  const world = {
+    version: 5,
+    files: [],
+    shots: [{ id: "old", externalKey: "upload#old" }],
+  };
   const { fetchImpl, calls } = fakePlatform(world);
 
   const first = await poll(dir, { fetchImpl });
@@ -229,7 +249,11 @@ test("the first poll records a baseline; later ones collect people's changes", a
   Object.assign(world, {
     version: 7,
     date: "Fri, 06 Nov 2026 13:00:00 GMT",
-    shots: 3,
+    shots: [
+      { id: "old", externalKey: "upload#old" },
+      { id: "ui", externalKey: "upload#new" },
+      { id: "agent", externalKey: "repo#shot.png" },
+    ],
     changes: [
       {
         createdAt: LATER,
