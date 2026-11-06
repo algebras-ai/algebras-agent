@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "algebras-capture"
+version = "0.1.0"
+description = "Unattended screenshot capture, OCR linking and manifest writer for the Algebras agent"
+requires-python = ">=3.10"
+dependencies = [
+  "pyyaml>=6",
+  "jsonschema>=4.18",
+  "rapidfuzz>=3",
+  "pillow>=10",
+  "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+ocr = ["pytesseract>=0.3.10"]
+browser = ["playwright>=1.40"]
+desktop = [
+  "mss>=9",
+  "pyautogui>=0.9.54",
+  "pydirectinput>=1.0.4; sys_platform == 'win32'",
+  "dxcam>=0.0.5; sys_platform == 'win32'",
+  "vgamepad>=0.1; sys_platform == 'win32'",
+]
+test = ["pytest>=8"]
+
+[project.scripts]
+algebras-capture = "algebras_capture.__main__:main"
+
+[tool.setuptools]
+packages = ["algebras_capture", "algebras_capture.backends", "algebras_capture.link"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

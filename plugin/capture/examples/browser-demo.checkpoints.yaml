@@ -1,0 +1,48 @@
+# Runs anywhere with Playwright: `python -m algebras_capture run examples/browser-demo.checkpoints.yaml`
+# The demo draws its UI on a canvas (like a game), so waits use OCR text, not DOM selectors.
+checkpointVersion: 1
+game: Lantern Street (capture demo)
+build: fixture-1
+language: en
+strings: ../fixtures/browser-demo/strings.json
+target:
+  kind: browser
+  url: ../fixtures/browser-demo/index.html
+  viewport: 1280x720
+defaults:
+  timeout: 30
+  retries: 1
+  settleMs: 600
+checkpoints:
+  - id: title
+    steps:
+      - wait: { text: "LANTERN STREET" }
+    expect: ["ui.json#title"]
+  - id: main_menu
+    steps:
+      - key: enter
+      - wait: { text: "Exit Game" }
+    expect: ["ui.json#menu.new_game", "ui.json#menu.exit"]
+  - id: options
+    steps:
+      - key: down
+      - key: enter
+      - wait: { text: "Master Volume" }
+    expect: ["ui.json#options.master", "ui.json#common.back"]
+  - id: dialogue_intro
+    steps:
+      - key: escape
+      - wait: { text: "New Game" }
+      - key: enter
+      - wait: { text: "Mira" }
+    expect: ["chars.json#mira", "dialogue.json#intro.1", "quests.json#q1.objective"]
+  - id: journal
+    steps:
+      - key: j
+      - wait: { text: "Journal" }
+    expect: ["journal.json#entry.1"]
+  - id: leave_confirm
+    steps:
+      - key: escape
+      - wait: { text: "Leave the street?" }
+    expect: ["ui.json#confirm.leave", "ui.json#common.yes", "ui.json#common.no"]
