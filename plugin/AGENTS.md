@@ -8,6 +8,7 @@ This agent helps human translators produce the best possible machine translation
 | 2 | `glossary` | Extract, research, and confirm project terminology | Complete `project.json` |
 | 3 | `translate` | Check each batch for ambiguity, translate it with the glossary and resolved facts, measure fluency as the project's setting says (context-free, context-aware, both, or none), and mid-batch consistency-check it | Complete `project.json` + confirmed glossary |
 | 4 | `qa` | Local QA with the flow's checks, full-corpus consistency, reviewer pass, and reporting the fluency scores `translate` already captured (no new calls) plus context coverage | At least one batch already translated |
+| Any time | `sync` | Apply what people changed on the platform: approved and edited translations go into the repo's files, context and reference files are taken in | `project.json` with a `project_id` |
 
 The agent is format-agnostic. Do not assume any particular file extension, column structure, or glossary format. Generate tools and config on demand as you learn the project.
 
@@ -58,6 +59,9 @@ In a git repository, the work lands on its own branch (`algebras/localize-<YYYYM
 - Missing context never blocks the pipeline. Unresolved facts stay `open`, become client questions on the platform project (exported to `client_questions.md`), and translation uses wording that does not commit to the unknown fact.
 - Ask little at the start. The intake step shows one coverage table and at most 5 questions, ranked by how many strings each answer unblocks. Everything else goes to the client question list.
 - Only `resolved` facts and glossary hits are locks — for translation and for context-aware fluency. `agent-choice`, `provisional` and `glossary-candidate` never are.
+- People review and edit the project on the platform. At the start of every session run `node tools/platform-sync.mjs` if `tools/` has it (Claude Code plugin sessions do this through a hook), and when it reports changes, apply them first with the `sync` skill (`skills/sync/SKILL.md`): approved text goes into the files before other work. An hourly schedule can keep polling between sessions (`--install-schedule`, offered in setup).
+- Fill in as much of the context as the project's files answer. `CONTEXT_SCHEMA.md` lists every field and where to find it; `get_context_schema` returns the same structure from the platform.
+- Store fluency scores with `record_fluency`, and context files and screenshots on the platform (`onboard` 1.6b), so the team sees what the agent works from.
 - What to collect is specified in `CONTEXT_REQUIREMENTS.md`. Which of that a project needs is the flow in `PROJECT_TYPES.md`: `games`, `edtech`, `fintech`, `saas`, or `general`.
 
 ### Tool generation

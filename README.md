@@ -70,9 +70,14 @@ Put any brief, style guide, character list, glossary, or screenshots in the proj
 | **Translation memory** | Translations already in your repo are kept and reused as the reference for terminology and style. They aren't translated again. Every translation the agent writes is recorded as a draft on the platform; you approve, edit or reject drafts in chat at the end of QA or in the platform's review screen. Translation memory reuses only approved translations with the same source text, speaker and addressee; only misses are translated. |
 | **Context files** | Specs, docs, lore and style guides found in your repo are classified by what they cover and read before glossary extraction and each translation batch. |
 | **Context facts** | Who speaks, to whom, formal or informal, what a placeholder stands for — recorded only from a cited source and stored on your Algebras platform project, where you can review and edit them. Open points go to `client_questions.md`, and the translation avoids committing to them. |
-| **Screenshots** | Screenshots already in your repo are linked to strings by column or file name and used as context. Automatic capture is coming soon. |
+| **Screenshots** | Screenshots already in your repo are linked to strings by column or file name, stored on the platform and used as context. Automatic capture is coming soon. |
 
 ---
+
+
+### Working with the platform
+
+The platform project stays in step with your repo. Context, context files, screenshots, draft translations and fluency scores are stored there, and people review them on the project page. When a session starts, and once an hour if you agreed during setup, the agent polls for what they changed and the `sync` skill writes approved text back into your files. Your repo's parser does the writing; if a file has uncommitted changes, the agent asks first.
 
 ## Install
 

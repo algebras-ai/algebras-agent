@@ -1,7 +1,7 @@
 ---
 name: translate
 description: Phase 3 of the Algebras translation workflow (Translation) — check each batch for ambiguity (resolved/open/conflict facts), reuse matching translations from translation memory, translate only the misses via the Algebras MCP tools with the glossary and resolved facts, measure fluency as the project's setting says (context-free on a no-glossary translation, context-aware on the written text with neighbors and locks, both, or none), run a mid-batch consistency check against everything already translated, and fix glossary misses in one final glossary pass after all batches. Requires a completed project.json and a confirmed glossary.
-allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(node tools/run-report.mjs:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__set_glossary_term_status, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__lookup_translation_memory, mcp__algebras__record_translations, mcp__algebras__get_project_context, mcp__algebras__update_project_context, mcp__algebras__list_strings, mcp__algebras__get_string_context, mcp__algebras__update_string_contexts, mcp__algebras__list_context_changes]
+allowed-tools: ["Bash(git rev-parse:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(node tools/run-report.mjs:*)", Read, Write, Edit, Glob, Grep, WebSearch, mcp__algebras__translate_text, mcp__algebras__translate_batch, mcp__algebras__translate_batch_async, mcp__algebras__get_translate_batch_async_status, mcp__algebras__check_fluency, mcp__algebras__check_fluency_batch, mcp__algebras__create_glossary_term, mcp__algebras__set_glossary_term_status, mcp__algebras__list_glossary_terms, mcp__algebras__count_glossary_terms, mcp__algebras__lookup_translation_memory, mcp__algebras__record_translations, mcp__algebras__record_fluency, mcp__algebras__list_context_files, mcp__algebras__read_context_file, mcp__algebras__list_screenshots, mcp__algebras__get_screenshot, mcp__algebras__get_project_context, mcp__algebras__update_project_context, mcp__algebras__list_strings, mcp__algebras__get_string_context, mcp__algebras__update_string_contexts, mcp__algebras__list_context_changes]
 ---
 
 # Phase 3 — Translation
@@ -19,6 +19,9 @@ Once per session, before the first batch:
 
 1. `get_project_context` with `project.json`'s `project_id`. Keep the project context and its `context.version`.
 2. `list_strings`, following the cursor to the end. Keep each string's `context.data` and `context.version`, and the first page's `contextVersion` as `last_seen_version` (`CONTEXT_REQUIREMENTS.md`, "Versions").
+
+3. `list_context_files` and `list_screenshots`. People add reference files and screenshots in the platform: read the files with `sendToAi` true that you don't have locally (`read_context_file`; a matching `sha256` means your copy is current), and use screenshots with `sendToAi` true when one helps with an open fact (`get_screenshot`). Never use one with `sendToAi` false.
+4. If `.algebras/sync/inbox.json` has news, apply it first with the `sync` skill (`algebras-agent:sync`, or `skills/sync/SKILL.md`): people's approved text goes in the files before you translate around it.
 
 Keep this in memory. When a local tool needs the context (e.g. `tools/fluency_ctx.py` in 3.3b), write it to `tools/context_cache.json` and pass that file to the tool; it's a disposable copy, refreshed whenever the context is re-read, and never edited by hand.
 
@@ -95,7 +98,7 @@ Before step 1, look up the batch in translation memory and reuse translations pe
 - `texts` — the batch's source strings, each with its speaker and addressee from the platform string, on every lookup: `{ "text": "...", "speakerId": "...", "addresseeId": "..." }`. Take them from `speaker.value` and `addressee.value` in the string's current `context.data` (session start, refreshed in 3.1, including what 3.1b just wrote), whatever the fact's status, since approved translations are stored with those values. Leave out a field whose value is `null` or that the context doesn't have. A plain string means no speaker and no addressee, and matches only approved translations stored without either.
 - `targetLanguage`.
 
-Translation memory holds only translations people approved — in the platform's review screen or the `qa` skill's 4.6 — and matches on the same source text, target language, speaker and addressee. Drafts and rejected translations never match. Each text comes back with `match: null` (a miss) or a match carrying `output`, `revisionId`, `stringId`, `createdAt`, `source` and `actorType`.
+Translation memory holds only translations people approved — on the platform's project page or the `qa` skill's 4.6 — and matches on the same source text, target language, speaker and addressee. Drafts and rejected translations never match. Each text comes back with `match: null` (a miss) or a match carrying `output`, `revisionId`, `stringId`, `createdAt`, `source` and `actorType`.
 
 **Per match.** Check tags `<...>`, placeholders `{...}`, variables and numbers. If they're intact, write it in 3.3 as is. If they're not, re-translate that string alone with `translate_text` (with `glossaryId`, no `fluency`) — a step-3 fix, not a new step 1/2.
 
@@ -180,7 +183,7 @@ Verify the exact edited cells by parsing the file again after writing.
 
 ## 3.3a Record the written translations
 
-Every translation written to a file is also recorded on the platform project as a draft for review, so people can approve it in the platform's review screen or in the `qa` skill's 4.6, and translation memory reuses it once approved. After writing a chunk, call `record_translations` with `projectId` (`project.json`'s `project_id`), `source: "translate"` and one item per written string: `{ "externalKey": "<file>#<id>", "language": "<target>", "text": "<the written text>", "origin": "machine" }` — the `externalKey` onboard 1.6 imported the string with. At most 500 items per call.
+Every translation written to a file is also recorded on the platform project as a draft for review, so people can approve it on the platform's project page or in the `qa` skill's 4.6, and translation memory reuses it once approved. After writing a chunk, call `record_translations` with `projectId` (`project.json`'s `project_id`), `source: "translate"` and one item per written string: `{ "externalKey": "<file>#<id>", "language": "<target>", "text": "<the written text>", "origin": "machine" }` — the `externalKey` onboard 1.6 imported the string with. At most 500 items per call.
 
 - This covers TM matches too. The one exception is a match whose `stringId` is this string: it already is this string's approved translation, and recording it again would only add a duplicate draft.
 - A step-3 fix (a TM match that failed its check or a broken placeholder) and a 3.5 fix are recorded the same way after they're written; the new draft replaces the string's earlier draft.
@@ -240,6 +243,8 @@ Write one line per string to `tools/fluency_scores.jsonl` when the batch's check
 - `terms`, `term_only` and `ctx_neighbors` come from step 4 (empty when step 4 doesn't run).
 - `tags` lists the string's `agent-choice` and `provisional` tags from 3.1b (empty when it has none).
 - `decision`, `decision_reason` and `revised_after_scoring` are added later by the `qa` skill's 4.3.
+
+**Store the scores on the platform.** After the log is updated and the chunk is recorded (3.3a), call `record_fluency` with `projectId` and up to 500 items of `{ "externalKey": "<file>#<id>", "language": "<target>", "mode": "context" or "isolated", "score": { "value": ..., "idiomatic": ..., "collocational": ..., "discourse": ..., "pragmatic": ..., "calque": ..., "issue_type": ..., "severity": ..., "problematic_phrase": ..., "suggested_fix": ..., "main_issue": ... } }`. `value` is the check's `fluency`. For `context`, also pass `text`, the translation you scored: a string someone changed in the meantime comes back `text_changed` and isn't stored. For `isolated`, leave `text` out, since it scores the no-glossary translation. A string with no score in a mode gets no item for it. Scores show next to the string in the platform; a failed call never blocks the batch, so report it and go on.
 
 This log is the **only** source of fluency data from here on — never call `check_fluency`/`check_fluency_batch` again for a string that already has a score in that mode.
 

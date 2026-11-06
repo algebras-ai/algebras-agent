@@ -10,6 +10,8 @@ A fact is resolved only from a cited source: one of these files, a column in the
 
 The Algebras platform project is the single source of truth for context. Its project context (description, defaults, characters, relations, style, notes) and the per-string context of every string are stored on the platform, versioned, and read and written through the `algebras` MCP server's context tools: `import_project`, `get_project_context`, `update_project_context`, `list_strings`, `get_string_context`, `update_string_contexts` and `list_context_changes`. People edit the same records in the platform UI, so the agent re-reads them before each batch instead of trusting what it read earlier.
 
+The full structure of both records, field by field with where to find each value, is in `CONTEXT_SCHEMA.md`.
+
 `project.json`'s `project_id` names the platform project. Local files are never the store: `context_pack.json` and `context_facts.jsonl` are the import input onboard builds from the repo (see onboard 1.6), `tools/context_cache.json` is a disposable copy written only when a local tool needs the context, and `client_questions.md` is an export of the project's question notes.
 
 **Versions.** Two numbers are easy to mix up. A record's own `version` (`context.version`, on the project context and on each string) is the `baseVersion` of a write to that record. The project-wide `contextVersion` (`project.contextVersion` from `get_project_context`, `contextVersion` from `list_strings`) moves with every change in the project and is what `changedSinceVersion` and `list_context_changes`' `sinceVersion` take.
@@ -31,9 +33,9 @@ An `invalid` result means the payload broke the schema: fix it and retry, or rep
 | Universe | Setting, era, lore, product description | Sent as context with translation requests | Games, marketing |
 | Tone of voice | Style guide per language, short brief, formality matrix by speaker and listener | Steers register; the matrix resolves tu/vous and speech levels | Games, marketing, UI |
 | Social graph | Characters with gender and description; relationships with type and tone | Resolves speaker gender and formality per line | Games, dialogue, subtitles |
-| UX screenshots | Images linked to string keys or row numbers | Resolves UI meaning, length limits, and ambiguous labels | UI, games |
+| UX screenshots | Images linked to string keys or row numbers, stored on the platform (`onboard` 1.6b) | Resolves UI meaning, length limits, and ambiguous labels | UI, games |
 | Integrations | memoQ, Gridly, Google Sheets, GitHub settings | Recorded only; no live connection from the agent | Optional |
-| Files | Any other reference documents | Read as reference when relevant | Optional |
+| Files | Any other reference documents | Stored on the platform (`onboard` 1.6b); read as reference when relevant | Optional |
 
 ## Accepted formats
 
