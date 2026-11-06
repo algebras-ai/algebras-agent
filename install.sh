@@ -3,8 +3,8 @@ set -euo pipefail
 
 PLATFORM_URL="https://platform.algebras.ai"
 GITHUB_RAW="https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/plugin"
-WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md)
-PHASE_SKILLS=(onboard glossary glossary-dedupe translate qa)
+WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md CONTEXT_SCHEMA.md)
+PHASE_SKILLS=(onboard glossary glossary-dedupe translate qa sync)
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 
@@ -75,13 +75,16 @@ for phase in "${PHASE_SKILLS[@]}"; do
     echo "  Copied:  $file"
   fi
 done
-if [[ -f tools/run-report.mjs ]]; then
-  echo "  Skipped: tools/run-report.mjs (already exists)"
-else
-  mkdir -p tools
-  curl -fsSL "$GITHUB_RAW/reports/run-report.mjs" -o tools/run-report.mjs
-  echo "  Copied:  tools/run-report.mjs"
-fi
+mkdir -p tools
+for script in reports/run-report.mjs reports/context-readback.mjs sync/platform-sync.mjs sync/upload-context-files.mjs capture/upload-screenshots.mjs; do
+  target="tools/$(basename "$script")"
+  if [[ -f "$target" ]]; then
+    echo "  Skipped: $target (already exists)"
+  else
+    curl -fsSL "$GITHUB_RAW/$script" -o "$target"
+    echo "  Copied:  $target"
+  fi
+done
 
 # ── API key ───────────────────────────────────────────────────────────────────
 

@@ -22,7 +22,7 @@ Resolve `PLUGIN_ROOT` this way:
 Then copy from `PLUGIN_ROOT`:
 
 ```bash
-for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md; do
+for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md CONTEXT_SCHEMA.md; do
   cp -n "${PLUGIN_ROOT}/$f" "$PROJECT_ROOT/$f" 2>/dev/null || true
 done
 ```
@@ -31,7 +31,7 @@ Also copy the phase skills (`onboard`, `glossary`, `translate`, `qa`, plus the o
 
 ```bash
 mkdir -p "$PROJECT_ROOT/skills"
-for phase in onboard glossary glossary-dedupe translate qa; do
+for phase in onboard glossary glossary-dedupe translate qa sync; do
   mkdir -p "$PROJECT_ROOT/skills/$phase"
   cp -n "${PLUGIN_ROOT}/skills/$phase/SKILL.md" "$PROJECT_ROOT/skills/$phase/SKILL.md" 2>/dev/null || true
 done
@@ -43,6 +43,9 @@ Copy the scripts the skills check their work with: the context read-back (`onboa
 mkdir -p "$PROJECT_ROOT/tools"
 cp -n "${PLUGIN_ROOT}/reports/run-report.mjs" "$PROJECT_ROOT/tools/run-report.mjs" 2>/dev/null || true
 cp -n "${PLUGIN_ROOT}/reports/context-readback.mjs" "$PROJECT_ROOT/tools/context-readback.mjs" 2>/dev/null || true
+cp -n "${PLUGIN_ROOT}/sync/platform-sync.mjs" "$PROJECT_ROOT/tools/platform-sync.mjs" 2>/dev/null || true
+cp -n "${PLUGIN_ROOT}/sync/upload-context-files.mjs" "$PROJECT_ROOT/tools/upload-context-files.mjs" 2>/dev/null || true
+cp -n "${PLUGIN_ROOT}/capture/upload-screenshots.mjs" "$PROJECT_ROOT/tools/upload-screenshots.mjs" 2>/dev/null || true
 ```
 
 Report which files were copied and which were skipped (already existed).
@@ -210,6 +213,16 @@ Use the Write or Edit tool so the key does not appear in shell output. This is t
 
 If `PROJECT_ROOT/project.json` exists, read it, set `"mcp_url": "${PLATFORM_URL}/api/mcp"`, and write it back. Skip silently if the file doesn't exist.
 
+## Step 5b — Hourly sync (ask first)
+
+People review and edit the project in the platform. To bring that back, the agent polls when a session starts and, if the user agrees, once an hour on this machine. Ask once: "Poll the Algebras platform hourly from this machine, so changes people make there are waiting when you come back? It adds one line to your crontab (a scheduled task on Windows) and sends only your API key to the platform." On yes, from `PROJECT_ROOT`:
+
+```bash
+node tools/platform-sync.mjs --install-schedule
+```
+
+Skip the question when running non-interactively. On no, polling still happens at session start. `--uninstall-schedule` removes it. If it fails (no `crontab` on this machine), say so and go on.
+
 ## Step 6 — Final confirmation
 
 Print:
@@ -218,9 +231,10 @@ Print:
 Setup complete.
 
   Workflow files  →  copied to <PROJECT_ROOT>
-  Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,glossary-dedupe,translate,qa}
+  Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,glossary-dedupe,translate,qa,sync}
   Run report      →  copied to <PROJECT_ROOT>/tools/run-report.mjs
   Context check   →  copied to <PROJECT_ROOT>/tools/context-readback.mjs
+  Platform sync   →  copied to <PROJECT_ROOT>/tools/platform-sync.mjs (hourly polling: <on / off>)
   API key         →  validated and saved to <PROJECT_ROOT>/.env (source: <env / project .env / global cache / device auth / fresh paste>)
   MCP server      →  registered in <Claude or Codex MCP config>
 
