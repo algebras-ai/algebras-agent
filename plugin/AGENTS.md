@@ -4,10 +4,11 @@ This agent helps human translators produce the best possible machine translation
 
 | Phase | Skill | Purpose | Prerequisite |
 |---|---|---|---|
-| 1 | `onboard` | Discover files, pick the flow, take in client context (coverage, facts, client questions), choose the fluency checks, generate `project.json` and parsers | None — entry point |
+| 1 | `onboard` | Discover files, pick the flow, take in client context (coverage, facts, client questions), choose the fluency checks, generate `project.json` and parsers, and import the strings and context into the Algebras platform project | None — entry point |
 | 2 | `glossary` | Extract, research, and confirm project terminology | Complete `project.json` |
 | 3 | `translate` | Check each batch for ambiguity, translate it with the glossary and resolved facts, measure fluency as the project's setting says (context-free, context-aware, both, or none), and mid-batch consistency-check it | Complete `project.json` + confirmed glossary |
 | 4 | `qa` | Local QA with the flow's checks, full-corpus consistency, reviewer pass, and reporting the fluency scores `translate` already captured (no new calls) plus context coverage | At least one batch already translated |
+| Any time | `sync` | Apply what people changed on the platform: approved and edited translations go into the repo's files, context and reference files are taken in | `project.json` with a `project_id` |
 
 The agent is format-agnostic. Do not assume any particular file extension, column structure, or glossary format. Generate tools and config on demand as you learn the project.
 
@@ -16,7 +17,7 @@ The agent is format-agnostic. Do not assume any particular file extension, colum
 - **If skill invocation is available in this session** (you can see `algebras-agent:onboard`, `algebras-agent:glossary`, `algebras-agent:translate`, `algebras-agent:qa` in your skill list): invoke the skill for the phase you're on. Each skill checks its own prerequisites first and tells you where to go if they aren't met — don't skip ahead manually.
 - **If skill invocation isn't available** (e.g. Cursor, Windsurf, or a Claude Code/Codex session without the `algebras-agent` plugin installed): open and follow the corresponding file in full, in order — `skills/onboard/SKILL.md` → `skills/glossary/SKILL.md` → `skills/translate/SKILL.md` → `skills/qa/SKILL.md`. Each file contains the same phase content and prerequisite checks as the skill; treat it as the skill's body.
 
-Start at `onboard` for a new project. If `project.json` already exists and is complete, `onboard` will tell you to skip ahead.
+Start at `onboard` for a new project. If `project.json` already exists and is complete, `onboard` will tell you to skip ahead. If the user gives an existing platform project id, `onboard` reads that project first and uses it — its strings, or the repo's strings imported into it — with the project's languages and glossary, reporting any difference with the files instead of overwriting the project, and never creating a second one.
 
 ## Project types
 
@@ -28,7 +29,7 @@ The user may declare a project type — `Project type: games|edtech|fintech|saas
 
 ## Delivery
 
-In a git repository, the work lands on its own branch (`algebras/localize-<YYYYMMDD>`, created in `translate` 3.0 with the user's confirmation) and is committed at the end of `qa` (4.6), so the user can review it like any other change. Never push or open a pull request unless the user asks.
+In a git repository, the work lands on its own branch (`algebras/localize-<YYYYMMDD>`, created in `translate` 3.0 with the user's confirmation) and is committed at the end of `qa` (4.7), so the user can review it like any other change. Never push or open a pull request unless the user asks.
 
 ---
 
@@ -43,16 +44,25 @@ In a git repository, the work lands on its own branch (`algebras/localize-<YYYYM
 ### Glossary
 
 - Glossaries live on the Algebras platform, not as local files. Create, read, update, and delete terms through the `algebras` MCP server's glossary tools (`create_glossary_term`, `list_glossary_terms`, `update_glossary_term`, `delete_glossary_term`, `count_glossary_terms`, etc.), and keep the working glossary's id in `project.json`'s `glossary_id`.
+- Before translating a batch, reuse earlier translations through the `algebras` MCP server's `lookup_translation_memory` (the `translate` skill's 3.2.0): only matches made with the project's glossary are used, and only misses are translated. Every written translation is recorded on the platform project as a draft (`record_translations`, the `translate` skill's 3.3a). Approve a translation with `set_translation_status` only after the user approves it in a table in chat (the `qa` skill's 4.6); the user's own rewrites are recorded with `origin: "manual"`. Translation memory reuses approved translations. New terms found while translating go to a local candidate list, and glossary misses are fixed in one final pass after all batches (3.5).
+- New terms are candidates, and editing an approved term's texts, gender or variants makes it a candidate again. Approve a term with `set_glossary_term_status` only after the user approves it in a table in chat (the `glossary` skill's 2.6). Translation prompts and the glossary counter use approved terms only, and only approved terms are locks.
+- Record grammatical gender in a definition's `gender` and other approved forms in its `variants`.
+- Set each definition's `caseSensitivity` when creating a term: `ignore` for ordinary words, `capitals` for names and abbreviations (the `glossary` skill's 2.5). The user can change it later. A term's `type` never drives matching.
 - Add valid inflected forms as their own term definitions when QA flags a correct translation.
 - Never rebuild the glossary from scratch unless the user explicitly asks — update or delete individual terms instead.
 - Optional deduplication across all glossary terms is available once a glossary exists — always ask the user first, never run automatically. See the `translate` skill's pre-batch step, or invoke the `glossary-dedupe` skill (`algebras-agent:glossary-dedupe`) directly at any time.
 
 ### Context
 
+- The Algebras platform project is the single source of truth for context: project context, per-string facts and client questions. `project.json`'s `project_id` names it. Read and write it through the `algebras` MCP server's context tools (`get_project_context`, `update_project_context`, `list_strings`, `get_string_context`, `update_string_contexts`, `list_context_changes`, and `import_project` in onboard). Every write passes the record's `baseVersion` and a `source`; after a refused write, re-read, retry once, then report to the user. Local context files are import input, caches or exports, never the store — see "Where context lives" in `CONTEXT_REQUIREMENTS.md`.
 - Never guess a context fact. A fact is resolved only from a cited source: a client file, a column in the source table, an official page for the same UI, or an explicit user answer. An inference stays a `candidate` until the user confirms it.
-- Missing context never blocks the pipeline. Unresolved facts stay `open`, go to `client_questions.md`, and translation uses wording that does not commit to the unknown fact.
+- Missing context never blocks the pipeline. Unresolved facts stay `open`, become client questions on the platform project (exported to `client_questions.md`), and translation uses wording that does not commit to the unknown fact.
 - Ask little at the start. The intake step shows one coverage table and at most 5 questions, ranked by how many strings each answer unblocks. Everything else goes to the client question list.
 - Only `resolved` facts and glossary hits are locks — for translation and for context-aware fluency. `agent-choice`, `provisional` and `glossary-candidate` never are.
+- Work through the `algebras` MCP tools and the scripts in `tools/`: they reach the platform's services directly. Don't open or drive a browser unless the user asks you to. When something is ready for review on the platform, give the link: `<platform>/translation/projects/<project_id>`.
+- People review and edit the project on the platform. At the start of every session run `node tools/platform-sync.mjs` if `tools/` has it (Claude Code plugin sessions do this through a hook), and when it reports changes, apply them first with the `sync` skill (`skills/sync/SKILL.md`): approved text goes into the files before other work. An hourly schedule can keep polling between sessions (`--install-schedule`, offered in setup).
+- Fill in as much of the context as the project's files answer. `CONTEXT_SCHEMA.md` lists every field and where to find it; `get_context_schema` returns the same structure from the platform.
+- Store fluency scores with `record_fluency`, and context files and screenshots on the platform (`onboard` 1.6b), so the team sees what the agent works from.
 - What to collect is specified in `CONTEXT_REQUIREMENTS.md`. Which of that a project needs is the flow in `PROJECT_TYPES.md`: `games`, `edtech`, `fintech`, `saas`, or `general`.
 
 ### Tool generation

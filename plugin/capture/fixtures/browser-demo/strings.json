@@ -1,0 +1,22 @@
+{
+  "ui.json#title": "LANTERN STREET",
+  "ui.json#title.press": "Press Enter to start",
+  "ui.json#menu.new_game": "New Game",
+  "ui.json#menu.options": "Options",
+  "ui.json#menu.credits": "Credits",
+  "ui.json#menu.exit": "Exit Game",
+  "ui.json#options.master": "Master Volume",
+  "ui.json#options.music": "Music Level",
+  "ui.json#options.window": "Window Mode",
+  "ui.json#common.back": "Back",
+  "chars.json#mira": "Mira",
+  "dialogue.json#intro.1": "The lanterns went out at midnight. Someone must have cut the wires.",
+  "quests.json#q1.objective": "Find the night watchman",
+  "ui.json#journal.title": "Journal",
+  "journal.json#entry.1": "The wires were cut cleanly, like with a tool.",
+  "ui.json#confirm.leave": "Leave the street?",
+  "ui.json#common.yes": "Yes",
+  "ui.json#common.no": "No",
+  "ui.json#menu.load_game": "Load Game",
+  "dialogue.json#intro.2": "Nobody saw anything. Nobody ever does on this street."
+}

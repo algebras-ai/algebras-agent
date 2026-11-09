@@ -21,9 +21,9 @@ What each context section holds, the column hints, screenshot linking, the langu
 These apply to every flow.
 
 - **Never guess a fact.** A fact is `resolved` only from a cited source. A line in parentheses that looks like a thought is a `candidate` speaker, not a resolved one. A formality cell a source leaves empty on purpose is a `conflict`, not a default.
-- **Write two files in onboard.** `context_pack.json` holds the project-level objects the flow lists under "Context pack". `context_facts.jsonl` holds one line per string per target language, with only the facts that string needs. The per-batch ambiguity check in translate adds to the same file.
-- **Missing context never blocks translation.** Unresolved facts stay `open` and go to `client_questions.md`.
-- **Questions are about facts, not documents.** "Who speaks rows 120 to 340, and to whom?" is the right shape; "Please provide a social graph" is not. Rank them by how many strings an answer unblocks, show at most five, and write all of them to `client_questions.md`. Skip a question whose string count is 0.
+- **Context lives on the platform project.** Onboard gathers the project-level objects the flow lists under "Context pack" and, per string and target language, only the facts that string needs, then imports them into the Algebras platform project (onboard 1.6). The per-batch ambiguity check in translate writes new facts to the same project.
+- **Missing context never blocks translation.** Unresolved facts stay `open` and become client questions (exported to `client_questions.md`).
+- **Questions are about facts, not documents.** "Who speaks rows 120 to 340, and to whom?" is the right shape; "Please provide a social graph" is not. Rank them by how many strings an answer unblocks, show at most five, and record all of them as client questions. Skip a question whose string count is 0.
 - **Translation receives only `resolved` facts.** `candidate`, `conflict` and `open` values are never sent as facts. For those strings the prompt asks for wording that does not commit to the unknown fact. Never invent a speaker, a learner's gender, or a customer's gender.
 - **Neighbors.** When the flow says neighbors matter, translation gets up to three source lines before the string and three after.
 - **Screenshots** are linked in the order in `CONTEXT_REQUIREMENTS.md`: a table column, then a file named by key or row, then a capture spec that is never run unless the user allows it.
@@ -123,9 +123,9 @@ These are the localization context sources the agent assembles during onboard, g
 | **Glossary** | Imported from the client's glossary files (with the user's confirmation) and extracted from code and UI strings (glossary 2.2), researched, confirmed by the user, and stored on the Algebras platform. |
 | **Translation memory** | Translations that already exist in the repo. Onboard 1.2c counts them; translate keeps them as-is (never re-sent for translation) and uses them as the reference for terminology and style. There is no separate platform translation-memory store yet. |
 | **Context files** | Specs, docs, lore, style guides and other client material found in the repo, classified into the sections of `CONTEXT_REQUIREMENTS.md`, listed in `project.json`'s `context_files`, and read before glossary extraction and each translation batch. |
-| **Context facts** | `context_pack.json` (project-level objects) and `context_facts.jsonl` (per-string facts with their status and source), plus `client_questions.md` for whatever is still open. |
+| **Context facts** | Project-level objects and per-string facts with their status and source, stored on the Algebras platform project and read and written through the MCP context tools; open points are client questions on the project, exported to `client_questions.md`. |
 | **Screenshots** | Screenshots already in the repo are linked to strings by column or file name and used as context. The agent can write a capture runner spec when the client has a playable build, but it never runs one without explicit permission — don't promise automatic capture. |
 
 ## Delivery
 
-When the project is a git repository, the agent works on its own branch (`algebras/localize-<YYYYMMDD>`, created in translate 3.0) and commits the result at the end of QA (qa 4.6) so the user can review it like any other change. It never pushes or opens a pull request unless the user asks.
+When the project is a git repository, the agent works on its own branch (`algebras/localize-<YYYYMMDD>`, created in translate 3.0) and commits the result at the end of QA (qa 4.7) so the user can review it like any other change. It never pushes or opens a pull request unless the user asks.

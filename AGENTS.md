@@ -39,7 +39,7 @@ Optional check that the key works: `GET https://platform.algebras.ai/api/v1/me` 
 
 ## Step 2 — Connect the Algebras MCP server
 
-The whole workflow runs through the `algebras` MCP server's tools (`translate_batch`, `check_fluency_batch`, `create_glossary`, `list_glossary_terms`, `count_glossary_terms`, ...). **Never generate translations yourself instead of calling them.**
+The whole workflow runs through the `algebras` MCP server's tools (`translate_batch`, `check_fluency_batch`, `create_glossary`, `list_glossary_terms`, `count_glossary_terms`, `lookup_translation_memory`, ...). **Never generate translations yourself instead of calling them.**
 
 If the `algebras` tools are already available in this session (e.g. you can call `list_glossaries`), skip to Step 3.
 
@@ -117,7 +117,7 @@ The workflow is the file `<RAW>/CLAUDE.md` plus the files it points to. Read the
 | `<RAW>/CLAUDE.md` | The workflow overview and standing rules. Follow it for the whole run. |
 | `<RAW>/PROJECT_TYPES.md` | The `games`, `edtech`, `fintech`, `saas` and `general` flows. |
 | `<RAW>/CONTEXT_REQUIREMENTS.md` | Client context sections, the fact model, and which facts each target language forces. |
-| `<RAW>/skills/onboard/SKILL.md` | Phase 1: discover files, context and existing translations, ask the fluency setting, write `project.json`. |
+| `<RAW>/skills/onboard/SKILL.md` | Phase 1: discover files, context and existing translations, ask the fluency setting, write `project.json`, import the strings and context into the Algebras platform project. |
 | `<RAW>/skills/glossary/SKILL.md` | Phase 2: build the glossary on the Algebras platform. |
 | `<RAW>/skills/translate/SKILL.md` | Phase 3: ambiguity check, then translate and score fluency in batches through the MCP tools. |
 | `<RAW>/skills/qa/SKILL.md` | Phase 4: QA, fluency report, deliver on the branch. |
@@ -144,6 +144,8 @@ If no type is given, onboarding infers it from the strings and falls back to `ge
 
 If the prompt has a `Fluency: none|isolated|context|both` line, onboarding uses it; otherwise onboarding asks once which fluency checks to run.
 
+If the prompt names an existing Algebras platform project — e.g. a `Project id: <id>` line, for a project created in the platform UI — onboarding reads that project first and uses it: its strings if it already has them, otherwise it imports the repo's strings into it. The project's source and target languages and glossary are used, differences with the files are reported to the user, and no second project is created.
+
 ## Step 5 — Run the workflow
 
 Run the four phases in order, each in full: **Onboard → Glossary → Translate → QA**. Each phase has user-confirmation gates (project summary and fluency setting, glossary approval, branch and commit) — stop and wait for the user at each one; don't skip them to finish faster.
@@ -159,7 +161,7 @@ In a git repository, the translated files land on their own branch — `algebras
 Describe these to the user accurately:
 
 - **Glossary** — extracted from code and UI strings, checked against established translations, confirmed by the user, and stored on the Algebras platform.
-- **Translation memory** — translations already in the repo are kept and reused as the reference for terminology and style. They're never sent for translation again.
+- **Translation memory** — translations already in the repo are kept and reused as the reference for terminology and style. They're never sent for translation again. Every translation the agent writes is recorded on the platform project as a draft; you approve, edit or reject drafts in chat at the end of QA or in the platform's review screen. Approved translations with the same source text, speaker and addressee are looked up with `lookup_translation_memory` before each batch and reused; only misses are translated.
 - **Context files** — specs, docs, lore and style guides found in the repo, classified by the sections in `CONTEXT_REQUIREMENTS.md` and read before glossary extraction and each translation batch.
-- **Context facts** — who speaks, to whom, formal or informal, what a placeholder means: recorded in `context_pack.json` and `context_facts.jsonl` only from a cited source. Open points go to `client_questions.md`; missing context never blocks translation.
+- **Context facts** — who speaks, to whom, formal or informal, what a placeholder means: recorded only from a cited source and stored on the Algebras platform project, which is the single source of truth (onboarding imports them from the repo; later phases read and write them through the MCP context tools, and edits made in the platform UI are picked up before each batch). Open points become client questions, exported to `client_questions.md`; missing context never blocks translation.
 - **Screenshots** — screenshots already in the repo are linked to strings and used as context. Automatic screenshot capture isn't available yet.

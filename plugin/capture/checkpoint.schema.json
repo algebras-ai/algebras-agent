@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/algebras-ai/algebras-agent/plugin/capture/checkpoint.schema.json",
+  "title": "Algebras capture checkpoint spec",
+  "description": "How to reach each screen of a playable build and what it should show. Written by hand or from a short manual playthrough; run unattended by `python -m algebras_capture run`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["checkpointVersion", "game", "target", "checkpoints"],
+  "properties": {
+    "checkpointVersion": { "const": 1 },
+    "game": { "type": "string", "minLength": 1 },
+    "build": { "type": "string" },
+    "language": { "type": "string", "default": "en" },
+    "keyPattern": { "type": "string", "pattern": "\\{row\\}" },
+    "strings": {
+      "type": "string",
+      "description": "Source strings for linking: a JSON {key: text} file or a CSV (key,text). Relative to the spec file."
+    },
+    "target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "steamAppId"],
+          "properties": {
+            "kind": { "const": "steam" },
+            "steamAppId": { "type": "string", "pattern": "^[0-9]+$" },
+            "windowTitle": { "type": "string", "description": "Substring of the game window title." },
+            "resolution": { "$ref": "#/$defs/resolution" },
+            "launchArgs": { "type": "array", "items": { "type": "string" } },
+            "startupTimeout": { "type": "number", "minimum": 1, "default": 120 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "command"],
+          "properties": {
+            "kind": { "const": "exe" },
+            "command": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "windowTitle": { "type": "string" },
+            "resolution": { "$ref": "#/$defs/resolution" },
+            "startupTimeout": { "type": "number", "minimum": 1, "default": 120 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "window", "description": "Attach to an already-running window; nothing is launched." },
+            "windowTitle": { "type": "string" },
+            "resolution": { "$ref": "#/$defs/resolution" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "url"],
+          "properties": {
+            "kind": { "const": "browser" },
+            "url": { "type": "string", "description": "http(s) URL, or a path relative to the spec file." },
+            "viewport": { "$ref": "#/$defs/resolution" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "frames"],
+          "properties": {
+            "kind": { "const": "fake" },
+            "frames": {
+              "type": "array",
+              "description": "Test only: image files shown in order; each input action advances one frame.",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      ]
+    },
+    "input": { "enum": ["playwright", "pyautogui", "pydirectinput", "xdotool", "ydotool", "vgamepad", "fake"] },
+    "capture": { "enum": ["playwright", "mss", "dxcam", "fake"] },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout": { "type": "number", "minimum": 0 },
+        "retries": { "type": "integer", "minimum": 0 },
+        "settleMs": { "type": "integer", "minimum": 0, "description": "Wait for a stable frame this long before capturing." }
+      }
+    },
+    "checkpoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/checkpoint" }
+    }
+  },
+  "$defs": {
+    "resolution": { "type": "string", "pattern": "^[0-9]+x[0-9]+$" },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "description": { "type": "string" },
+        "steps": { "type": "array", "items": { "$ref": "#/$defs/step" }, "default": [] },
+        "timeout": { "type": "number", "minimum": 0 },
+        "expect": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "String keys (or literal texts) expected on this screen; used as linking hints and checked after capture."
+        },
+        "capture": { "type": "boolean", "default": true, "description": "false for pure navigation checkpoints." },
+        "sendToAi": { "type": "boolean", "default": true }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "relative": { "type": "boolean", "default": true, "description": "x/y are 0..1 fractions of the window." },
+        "button": { "enum": ["left", "right", "middle"], "default": "left" }
+      }
+    },
+    "keySpec": {
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "holdMs": { "type": "integer", "minimum": 0 },
+            "repeat": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "wait": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "text": { "type": "string", "description": "OCR text that must appear (case-insensitive, fuzzy)." },
+        "image": { "type": "string", "description": "Template PNG relative to the spec file." },
+        "selector": { "type": "string", "description": "Browser only: CSS selector that must be visible." },
+        "stable": { "type": "boolean", "description": "Wait until consecutive frames stop changing." },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "timeout": { "type": "number", "minimum": 0 }
+      }
+    },
+    "step": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "key": { "$ref": "#/$defs/keySpec" },
+        "keys": { "type": "array", "items": { "$ref": "#/$defs/keySpec" } },
+        "click": { "$ref": "#/$defs/point" },
+        "type": { "type": "string" },
+        "gamepad": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["button"],
+          "properties": { "button": { "type": "string" }, "holdMs": { "type": "integer", "minimum": 0 } }
+        },
+        "sleep": { "type": "number", "minimum": 0 },
+        "wait": { "$ref": "#/$defs/wait" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

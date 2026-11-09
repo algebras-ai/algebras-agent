@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Set up the Algebras translation agent — copies workflow files, registers MCP, and obtains the API key via browser device authorization (or a cached/env-provided key when possible)
+description: Set up the Algebras translation agent — copies workflow files, registers MCP, and obtains the API key by device authorization through a link the user opens (or a cached/env-provided key when possible)
 allowed-tools: [Read, Write, Edit]
 ---
 
@@ -22,7 +22,7 @@ Resolve `PLUGIN_ROOT` this way:
 Then copy from `PLUGIN_ROOT`:
 
 ```bash
-for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md; do
+for f in CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md CONTEXT_SCHEMA.md; do
   cp -n "${PLUGIN_ROOT}/$f" "$PROJECT_ROOT/$f" 2>/dev/null || true
 done
 ```
@@ -31,10 +31,21 @@ Also copy the phase skills (`onboard`, `glossary`, `translate`, `qa`, plus the o
 
 ```bash
 mkdir -p "$PROJECT_ROOT/skills"
-for phase in onboard glossary glossary-dedupe translate qa; do
+for phase in onboard glossary glossary-dedupe translate qa sync; do
   mkdir -p "$PROJECT_ROOT/skills/$phase"
   cp -n "${PLUGIN_ROOT}/skills/$phase/SKILL.md" "$PROJECT_ROOT/skills/$phase/SKILL.md" 2>/dev/null || true
 done
+```
+
+Copy the scripts the skills check their work with: the context read-back (`onboard` 1.6) and the run report (`translate` and `qa`):
+
+```bash
+mkdir -p "$PROJECT_ROOT/tools"
+cp -n "${PLUGIN_ROOT}/reports/run-report.mjs" "$PROJECT_ROOT/tools/run-report.mjs" 2>/dev/null || true
+cp -n "${PLUGIN_ROOT}/reports/context-readback.mjs" "$PROJECT_ROOT/tools/context-readback.mjs" 2>/dev/null || true
+cp -n "${PLUGIN_ROOT}/sync/platform-sync.mjs" "$PROJECT_ROOT/tools/platform-sync.mjs" 2>/dev/null || true
+cp -n "${PLUGIN_ROOT}/sync/upload-context-files.mjs" "$PROJECT_ROOT/tools/upload-context-files.mjs" 2>/dev/null || true
+cp -n "${PLUGIN_ROOT}/capture/upload-screenshots.mjs" "$PROJECT_ROOT/tools/upload-screenshots.mjs" 2>/dev/null || true
 ```
 
 Report which files were copied and which were skipped (already existed).
@@ -49,13 +60,13 @@ Then look for a usable key, in this order, stopping at the first hit:
 2. **This project's `.env`.** If `PROJECT_ROOT/.env` already has a non-empty `ALGEBRAS_API_KEY=` line, use it. Don't make someone re-paste a key just because they're re-running setup on a project they've already configured.
 3. **Global credential cache** (`<home>/.algebras/credentials.json`, see Step 2.2 for how `<home>` is resolved). If it has an entry for `PLATFORM_URL`, tell the user you're reusing the saved key for that platform URL and let them opt out: "Using your saved Algebras key for `<PLATFORM_URL>` — say 'use a different key' if you want to switch."
 4. **Device authorization** (Step 2.1a) — the default interactive path when none of the above produced a key.
-5. **Browser + manual paste** (Step 2.1b) — fallback only: device authorization failed or errored, or the user explicitly asks for it.
+5. **Manual paste** (Step 2.1b) — fallback only: device authorization failed or errored, or the user explicitly asks for it.
 
 Whichever key you end up with, always run it through Step 2.3 (validate) before writing anything to disk.
 
 ### 2.1a Device authorization (primary)
 
-No manual "create a key" step — the user just approves the CLI in their browser, the same way `gh auth login` or `docker login` work.
+No manual "create a key" step — the user opens a link and approves the CLI, the same way `gh auth login` or `docker login` work.
 
 1. Request a device code:
 
@@ -67,7 +78,7 @@ No manual "create a key" step — the user just approves the CLI in their browse
 
    Response: `{device_code, user_code, verification_uri_complete, expires_in, interval}`. If this request fails outright (network error, 404 — an older platform without this endpoint, etc.), don't retry it — fall straight through to Step 2.1b.
 
-2. Open the browser to `verification_uri_complete` (same `open` / `xdg-open` / `start` pattern as 2.1b). Tell the user: "Approve access in your browser — waiting..." If the browser can't be opened, print the URL instead.
+2. Give the user the link: "Open this link and approve access: `<verification_uri_complete>` — waiting..."
 
 3. Poll for the result:
 
@@ -85,22 +96,9 @@ No manual "create a key" step — the user just approves the CLI in their browse
    - `{"error":"expired_token", ...}` → the user didn't approve in time (default 15m). Ask whether to start over or fall back to 2.1b.
    - Anything else (malformed response, connection errors, repeated unexpected failures) → fall through to Step 2.1b rather than looping forever.
 
-### 2.1b Browser + manual paste (fallback)
+### 2.1b Manual paste (fallback)
 
-Open the Algebras API keys page in the default browser:
-
-```bash
-# macOS
-open "${PLATFORM_URL}/api-keys"
-# Linux
-xdg-open "${PLATFORM_URL}/api-keys"
-# Windows
-start "" "${PLATFORM_URL}/api-keys"
-```
-
-If the browser can't be opened, print: "Open this URL to get your API key: `<PLATFORM_URL>/api-keys`"
-
-Then tell the user: "Your browser should now be open at `<PLATFORM_URL>/api-keys` — paste your API key here."
+Tell the user: "Get your API key at `<PLATFORM_URL>/api-keys` and paste it here."
 
 Wait for the user to paste the key. Check: the value must be non-empty and must not contain spaces. If invalid, ask again. Never print the full key back into the conversation.
 
@@ -126,7 +124,7 @@ CRED_FILE="${CRED_HOME}/.algebras/credentials.json"
 ```
 
 - **Reading**: if `CRED_FILE` exists, parse it and look up `PLATFORM_URL` as a key.
-- **Writing**: after Step 2.3 successfully validates a key that came from Step 2.1a or 2.1b (device auth or a fresh browser+paste), save it to `CRED_FILE` so future `setup` runs on any project skip straight past both. Read the existing file first (if any) so you only add/update the one entry for `PLATFORM_URL` instead of clobbering entries for other platform URLs. Create the parent directory (`mkdir -p`) if it doesn't exist. Use the Write tool, not shell echo, so the key doesn't appear in Bash output.
+- **Writing**: after Step 2.3 successfully validates a key that came from Step 2.1a or 2.1b (device auth or a fresh paste), save it to `CRED_FILE` so future `setup` runs on any project skip straight past both. Read the existing file first (if any) so you only add/update the one entry for `PLATFORM_URL` instead of clobbering entries for other platform URLs. Create the parent directory (`mkdir -p`) if it doesn't exist. Use the Write tool, not shell echo, so the key doesn't appear in Bash output.
 - **Permissions**: restrict `CRED_FILE` to the current user where the platform supports it — `chmod 600 "$CRED_FILE"` on Linux/macOS/Git Bash/WSL. This is a POSIX permission bit with no real equivalent on native Windows (NTFS uses ACLs, not mode bits): if `chmod` isn't available or errors, skip it rather than fail the step — a normal per-user Windows profile directory is already private by default. Never fail the whole setup over this.
 - Don't write to the cache when the key came from the shell environment (1) or the project's own `.env` (2) — only a freshly obtained key (2.1a or 2.1b) needs to be persisted.
 
@@ -202,6 +200,16 @@ Use the Write or Edit tool so the key does not appear in shell output. This is t
 
 If `PROJECT_ROOT/project.json` exists, read it, set `"mcp_url": "${PLATFORM_URL}/api/mcp"`, and write it back. Skip silently if the file doesn't exist.
 
+## Step 5b — Hourly sync (ask first)
+
+People review and edit the project in the platform. To bring that back, the agent polls when a session starts and, if the user agrees, once an hour on this machine. Ask once: "Poll the Algebras platform hourly from this machine, so changes people make there are waiting when you come back? It adds one line to your crontab (a scheduled task on Windows) and sends only your API key to the platform." On yes, from `PROJECT_ROOT`:
+
+```bash
+node tools/platform-sync.mjs --install-schedule
+```
+
+Skip the question when running non-interactively. On no, polling still happens at session start. `--uninstall-schedule` removes it. If it fails (no `crontab` on this machine), say so and go on.
+
 ## Step 6 — Final confirmation
 
 Print:
@@ -210,7 +218,10 @@ Print:
 Setup complete.
 
   Workflow files  →  copied to <PROJECT_ROOT>
-  Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,glossary-dedupe,translate,qa}
+  Phase skills    →  copied to <PROJECT_ROOT>/skills/{onboard,glossary,glossary-dedupe,translate,qa,sync}
+  Run report      →  copied to <PROJECT_ROOT>/tools/run-report.mjs
+  Context check   →  copied to <PROJECT_ROOT>/tools/context-readback.mjs
+  Platform sync   →  copied to <PROJECT_ROOT>/tools/platform-sync.mjs (hourly polling: <on / off>)
   API key         →  validated and saved to <PROJECT_ROOT>/.env (source: <env / project .env / global cache / device auth / fresh paste>)
   MCP server      →  registered in <Claude or Codex MCP config>
 

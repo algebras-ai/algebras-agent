@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Capture demo game</title>
+<style>
+  html, body { margin: 0; background: #120a24; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<!-- A tiny canvas "game": the UI is drawn on a canvas, so it is as opaque to the DOM as a real game
+     UI. Keyboard: Enter / Escape / ArrowUp / ArrowDown / J (journal). Screens fade in over 400 ms. -->
+<canvas id="c" width="1280" height="720"></canvas>
+<script>
+const S = {
+  title: "LANTERN STREET", press: "Press Enter to start",
+  menu: ["New Game", "Options", "Credits", "Exit Game"],
+  options: { title: "Options", rows: ["Master Volume", "Music Level", "Window Mode"], back: "Back" },
+  speaker: "Mira", line1: "The lanterns went out at midnight. Someone must have cut the wires.",
+  objective: "Find the night watchman", journal: "Journal", entry: "The wires were cut cleanly, like with a tool.",
+  confirm: "Leave the street?", yes: "Yes", no: "No",
+};
+const c = document.getElementById("c"), g = c.getContext("2d");
+let screen = "title", sel = 0, shownAt = performance.now();
+function go(s) { screen = s; sel = 0; shownAt = performance.now(); }
+function text(t, x, y, size, color = "#f2e9ff", weight = "600", align = "left") {
+  g.font = `${weight} ${size}px DejaVu Sans, Arial, sans-serif`; g.fillStyle = color; g.textAlign = align; g.fillText(t, x, y);
+}
+function panel(x, y, w, h, color = "#3b1f78") { g.fillStyle = color; g.fillRect(x, y, w, h); }
+function background() {
+  const grd = g.createLinearGradient(0, 0, 0, 720); grd.addColorStop(0, "#1d1040"); grd.addColorStop(1, "#4b1d5c");
+  g.fillStyle = grd; g.fillRect(0, 0, 1280, 720);
+  g.fillStyle = "#2a1650"; for (let i = 0; i < 9; i++) g.fillRect(60 + i * 135, 360 - (i % 3) * 60, 90, 360);
+}
+function hud() { panel(24, 24, 420, 44, "rgba(20,10,40,0.75)"); text("o  " + S.objective, 40, 54, 20, "#e6e0f5", "500"); }
+function draw(now) {
+  background();
+  if (screen === "title") {
+    text(S.title, 640, 260, 72, "#ffd36b", "800", "center");
+    const pulse = 0.55 + 0.45 * Math.abs(Math.sin(now / 900));  // the only animated element
+    g.globalAlpha = pulse; text(S.press, 640, 420, 28, "#ffffff", "500", "center"); g.globalAlpha = 1;
+  } else if (screen === "menu") {
+    text(S.title, 80, 140, 48, "#ffd36b", "800");
+    S.menu.forEach((m, i) => { if (i === sel) panel(70, 222 + i * 70, 330, 54, "#6c2bd9"); text(m, 90, 260 + i * 70, 32); });
+  } else if (screen === "options") {
+    panel(340, 120, 600, 480);
+    text(S.options.title, 640, 190, 40, "#ffd36b", "800", "center");
+    S.options.rows.forEach((r, i) => { text(r, 400, 280 + i * 70, 28); panel(720, 260 + i * 70, 160, 14, "#9b7be0"); });
+    text(S.options.back, 640, 560, 26, "#ffffff", "600", "center");
+  } else if (screen === "dialogue") {
+    hud();
+    panel(250, 500, 780, 170); panel(250, 456, 200, 44, "#b026ff");
+    text(S.speaker, 270, 487, 24);
+    wrap(S.line1, 280, 550, 720, 26);
+  } else if (screen === "journal") {
+    hud();
+    panel(200, 100, 880, 520, "#efe6d2");
+    text(S.journal, 640, 170, 44, "#3a2a4a", "800", "center");
+    wrap(S.entry, 260, 260, 760, 26, "#3a2a4a");
+  } else if (screen === "confirm") {
+    hud();
+    panel(420, 260, 440, 200);
+    text(S.confirm, 640, 320, 30, "#ffffff", "600", "center");
+    panel(460, 370, 160, 56, "#b026ff"); text(S.yes, 540, 408, 26, "#fff", "600", "center");
+    panel(660, 370, 160, 56, "#b026ff"); text(S.no, 740, 408, 26, "#fff", "600", "center");
+  }
+  const fade = Math.min(1, (now - shownAt) / 400);  // screens fade in: captures must wait for it
+  if (fade < 1) { g.fillStyle = `rgba(0,0,0,${1 - fade})`; g.fillRect(0, 0, 1280, 720); }
+  requestAnimationFrame(draw);
+}
+function wrap(t, x, y, w, size, color) {
+  g.font = `500 ${size}px DejaVu Sans, Arial, sans-serif`;
+  let line = "", yy = y;
+  for (const word of t.split(" ")) {
+    if (g.measureText(line + word).width > w && line) { text(line.trim(), x, yy, size, color, "500"); line = ""; yy += size * 1.5; }
+    line += word + " ";
+  }
+  text(line.trim(), x, yy, size, color, "500");
+}
+addEventListener("keydown", e => {
+  const k = e.key;
+  if (screen === "title" && k === "Enter") go("menu");
+  else if (screen === "menu") {
+    if (k === "ArrowDown") sel = (sel + 1) % S.menu.length;
+    else if (k === "ArrowUp") sel = (sel + S.menu.length - 1) % S.menu.length;
+    else if (k === "Enter") go(["dialogue", "options", "menu", "menu"][sel]);
+  } else if (screen === "options" && k === "Escape") go("menu");
+  else if (screen === "dialogue" && (k === "j" || k === "J")) go("journal");
+  else if (screen === "journal" && k === "Escape") go("confirm");
+});
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

@@ -3,8 +3,8 @@ set -euo pipefail
 
 PLATFORM_URL="https://platform.algebras.ai"
 GITHUB_RAW="https://raw.githubusercontent.com/algebras-ai/algebras-agent/main/plugin"
-WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md)
-PHASE_SKILLS=(onboard glossary glossary-dedupe translate qa)
+WORKFLOW_FILES=(CLAUDE.md AGENTS.md .cursorrules .windsurfrules COMMON_MISTAKES.md PROJECT_TYPES.md CONTEXT_REQUIREMENTS.md CONTEXT_SCHEMA.md)
+PHASE_SKILLS=(onboard glossary glossary-dedupe translate qa sync)
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 
@@ -75,6 +75,16 @@ for phase in "${PHASE_SKILLS[@]}"; do
     echo "  Copied:  $file"
   fi
 done
+mkdir -p tools
+for script in reports/run-report.mjs reports/context-readback.mjs sync/platform-sync.mjs sync/upload-context-files.mjs capture/upload-screenshots.mjs; do
+  target="tools/$(basename "$script")"
+  if [[ -f "$target" ]]; then
+    echo "  Skipped: $target (already exists)"
+  else
+    curl -fsSL "$GITHUB_RAW/$script" -o "$target"
+    echo "  Copied:  $target"
+  fi
+done
 
 # ── API key ───────────────────────────────────────────────────────────────────
 
@@ -89,13 +99,7 @@ if [[ -n "$api_key" ]]; then
   echo "Using ALGEBRAS_API_KEY from your environment or .env."
 else
   api_keys_url="$PLATFORM_URL/api-keys"
-  if command -v open >/dev/null 2>&1; then
-    open "$api_keys_url"
-  elif command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "$api_keys_url" 2>/dev/null || true
-  else
-    printf '\nOpen this URL to get your API key:\n  %s\n' "$api_keys_url" >&2
-  fi
+  printf '\nGet your API key here:\n  %s\n' "$api_keys_url" >&2
 
   printf '\nPaste your Algebras API key:\n> ' >&2
   IFS= read -r api_key </dev/tty

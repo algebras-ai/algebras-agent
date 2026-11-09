@@ -54,6 +54,10 @@ During onboarding the agent asks which fluency checks to run, and records the an
 
 Scores land in `fluency_report.csv`. They are a self-check of the agent's own translation, not an independent review.
 
+### Using a project created in the platform
+
+If you created the project in the Algebras platform first (name, type, languages, optional glossary), add `Project id: <id>` to the prompt. The agent reads that project before anything else. If it already has strings, the agent works from them. If it's empty, the agent finds the strings in your repo and imports them into that project. Either way it uses the project's languages and glossary, tells you where your files disagree with them, and never creates a second project.
+
 ### Prepare your project folder
 
 Put any brief, style guide, character list, glossary, or screenshots in the project folder next to the translation files. Any file name is fine — the agent classifies files by their contents. What to include, and which facts each target language forces, is in [`plugin/CONTEXT_REQUIREMENTS.md`](plugin/CONTEXT_REQUIREMENTS.md). Missing context doesn't block translation: the agent asks at most five questions and writes the rest to `client_questions.md` for you to forward to the client.
@@ -63,12 +67,17 @@ Put any brief, style guide, character list, glossary, or screenshots in the proj
 | | |
 |---|---|
 | **Glossary** | Extracted from your code and UI strings, checked against established translations, and confirmed by you. Stored on the Algebras platform. |
-| **Translation memory** | Translations already in your repo are kept and reused as the reference for terminology and style. They aren't translated again. |
+| **Translation memory** | Translations already in your repo are kept and reused as the reference for terminology and style. They aren't translated again. Every translation the agent writes is recorded as a draft on the platform; you approve, edit or reject drafts in chat at the end of QA or in the platform's review screen. Translation memory reuses only approved translations with the same source text, speaker and addressee; only misses are translated. |
 | **Context files** | Specs, docs, lore and style guides found in your repo are classified by what they cover and read before glossary extraction and each translation batch. |
-| **Context facts** | Who speaks, to whom, formal or informal, what a placeholder stands for — recorded only from a cited source (`context_pack.json`, `context_facts.jsonl`). Open points go to `client_questions.md`, and the translation avoids committing to them. |
-| **Screenshots** | Screenshots already in your repo are linked to strings by column or file name and used as context. Automatic capture is coming soon. |
+| **Context facts** | Who speaks, to whom, formal or informal, what a placeholder stands for — recorded only from a cited source and stored on your Algebras platform project, where you can review and edit them. Open points go to `client_questions.md`, and the translation avoids committing to them. |
+| **Screenshots** | Screenshots already in your repo are linked to strings by column or file name, stored on the platform and used as context. Automatic capture is coming soon. |
 
 ---
+
+
+### Working with the platform
+
+The platform project stays in step with your repo. Context, context files, screenshots, draft translations and fluency scores are stored there, and people review them on the project page. When a session starts, and once an hour if you agreed during setup, the agent polls for what they changed and the `sync` skill writes approved text back into your files. Your repo's parser does the writing; if a file has uncommitted changes, the agent asks first. The agent works through the Algebras MCP tools and API; it gives you a link to the project page for review and never drives a browser unless you ask it to.
 
 ## Install
 
@@ -83,7 +92,7 @@ claude plugin marketplace add algebras-ai/algebras-agent
 claude plugin install algebras-agent@algebras-agent
 ```
 
-Then start an interactive session and run the setup skill — it opens your browser for the API key, copies workflow files into your project, and saves the key to `.env`:
+Then start an interactive session and run the setup skill — it gives you a link to get the API key, copies workflow files into your project, and saves the key to `.env`:
 
 ```
 claude
@@ -137,7 +146,7 @@ Run from your project root:
 curl -fsSL https://platform.algebras.ai/install | bash
 ```
 
-The script opens your browser for the API key, downloads the workflow files, and writes the MCP config automatically (`.cursor/mcp.json`, `.windsurf/mcp.json`, or `~/.codex/config.toml`).
+The script gives you a link to get the API key, downloads the workflow files, and writes the MCP config automatically (`.cursor/mcp.json`, `.windsurf/mcp.json`, or `~/.codex/config.toml`).
 
 If your agent isn't auto-detected, pass `--agent` explicitly:
 
@@ -176,6 +185,8 @@ The agent onboards your project, builds a glossary, translates, and runs QA, ask
 | `CONTEXT_REQUIREMENTS.md` | Client context the agent expects, the fact model, and which facts each target language forces |
 | `COMMON_MISTAKES.md` | Error taxonomy from real-world LQA |
 | `skills/<phase>/SKILL.md` | The phases: `onboard`, `glossary`, `translate`, `qa`, plus optional `glossary-dedupe` |
+| `reports/run-report.mjs` | Checks a run from the agent's logs: translation memory reuse, recorded translations, glossary compliance before and after the final pass (copied to `tools/` by setup) |
+| `reports/context-readback.mjs` | Compares the local context files with what the platform project holds after an import: facts, statuses and sources (copied to `tools/` by setup) |
 
 [`AGENTS.md`](AGENTS.md) at the repository root is the entry point for agents that follow this repo's URL without installing anything.
 
